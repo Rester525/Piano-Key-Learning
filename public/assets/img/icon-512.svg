@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e14"/>
+      <stop offset="100%" stop-color="#11161e"/>
+    </linearGradient>
+    <linearGradient id="key-white" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fdfcf8"/>
+      <stop offset="100%" stop-color="#e3dcc8"/>
+    </linearGradient>
+    <linearGradient id="key-black" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#383838"/>
+      <stop offset="100%" stop-color="#080808"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c6af7"/>
+      <stop offset="100%" stop-color="#f0c840"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="64" fill="url(#bg)"/>
+  <!-- Piano keyboard -->
+  <g transform="translate(64, 150)">
+    <!-- White keys -->
+    <rect x="0" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="54" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="108" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="162" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="216" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="270" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <rect x="324" y="0" width="48" height="214" rx="0 0 8 8" fill="url(#key-white)" stroke="#bfb8a0" stroke-width="2"/>
+    <!-- Black keys -->
+    <rect x="38" y="0" width="32" height="128" rx="0 0 6 6" fill="url(#key-black)"/>
+    <rect x="92" y="0" width="32" height="128" rx="0 0 6 6" fill="url(#key-black)"/>
+    <rect x="200" y="0" width="32" height="128" rx="0 0 6 6" fill="url(#key-black)"/>
+    <rect x="254" y="0" width="32" height="128" rx="0 0 6 6" fill="url(#key-black)"/>
+    <rect x="308" y="0" width="32" height="128" rx="0 0 6 6" fill="url(#key-black)"/>
+  </g>
+  <!-- Accent glow -->
+  <circle cx="430" cy="82" r="64" fill="url(#accent)" opacity="0.15"/>
+</svg>

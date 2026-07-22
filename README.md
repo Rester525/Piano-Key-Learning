@@ -196,4 +196,51 @@ MIT — free to use, modify, distribute.
 
 ---
 
+## Roadmap / Future Enhancements
+
+This section captures ideas discussed during development and their implementation plans.
+
+### 🎯 Phase 1: Core Polish (Next 1–2 weeks)
+| Idea | Description | Plan |
+|------|-------------|------|
+| **MIDI Input Support** | Connect physical MIDI keyboard for answer input | Add `navigator.requestMIDIAccess()` handler in `app.js`; map MIDI note numbers to semitone values; fallback gracefully when unavailable (Safari, mobile). |
+| **Service Worker / Offline** | Full offline support after first visit | Generate `sw.js` with Workbox or manual Cache API; precache `index.html`, `style.css`, `src/**`, `manifest.json`, icons. Register in `app.js` after load. |
+| **Statistics Dashboard** | Session history, accuracy per note, streak trends | Add `stats.js` module; store sessions in `localStorage` (or IndexedDB for larger data); render charts with simple Canvas or import Chart.js via CDN. |
+| **Custom Practice Sets** | User-defined note/interval/chord subsets | New sidebar section "Custom Set" with multi-select; persist to `localStorage`; filter `getPlayableSemis()` and chord/interval pools. |
+
+### 🎯 Phase 2: Learning Features (1–2 months)
+| Idea | Description | Plan |
+|------|-------------|------|
+| **Spaced Repetition (SM-2)** | Replace weighted random with proper SRS algorithm | Implement SM-2 in `engine.js` — track `easeFactor`, `interval`, `repetitions` per item; schedule reviews; show "due" count in UI. |
+| **Lesson / Curriculum Mode** | Guided progression: CDE → FGAB → CDEFGAB → accidentals → intervals → chords | Add `curriculum.js` with ordered lessons; each lesson unlocks next; store progress in `localStorage`; show lesson map UI. |
+| **Sheet Music Display** | Show staff notation for current question | Integrate VexFlow (ESM from CDN) to render a measure with the target note/chord; toggle with "Show Notation" checkbox. |
+| **Microphone Pitch Detection** | Sing/play a note, app detects pitch for ear training | Use Web Audio `AnalyserNode` + autocorrelation or `aubio.wasm`; map detected frequency to nearest semitone; use as answer input. |
+| **Multiplayer / Challenge Links** | Share a seeded session URL for competitive practice | Add `?seed=X&mode=Y` URL params; deterministic RNG via `seedrandom`; show leaderboard for that seed. |
+
+### 🎯 Phase 3: Platform & Polish (Ongoing)
+| Idea | Description | Plan |
+|------|-------------|------|
+| **Native Audio Samples** | Replace synthesized tones with real piano/guitar samples | Add `public/assets/audio/` with `.ogg`/`.mp3` per note (or use Web Audio `AudioBufferSourceNode` with decoded samples); toggle in settings. |
+| **iOS PWA Install Prompt** | Custom "Add to Home Screen" banner | Listen for `beforeinstallprompt`; show custom banner after 2nd visit; track dismissals. |
+| **Accessibility Audit** | Full WCAG 2.1 AA compliance | Semantic HTML review; ARIA labels for keyboard; color contrast check; keyboard-only navigation; screen reader testing. |
+| **Internationalization (i18n)** | Multiple languages for UI text | Extract all strings to `locales/en.json`; add language selector in sidebar; dynamic import locale files. |
+| **Chromatic Tuner Mode** | Real-time pitch meter for tuning instrument | New mode: listen via microphone, show cents deviation from target note; visual needle + text. |
+
+### 🎯 Phase 4: Advanced / Experimental
+| Idea | Description | Plan |
+|------|-------------|------|
+| **Hand Position / Fingering Hints** | Show suggested finger numbers on keys | Add fingering data to `GROUPS`; render small numbers on key corners; highlight suggested finger for current question. |
+| **Chord Progression Practice** | Play common progressions (ii-V-I, I-vi-IV-V, etc.) | Extend `CHORD_QUALITIES` with progression definitions; new mode plays progression, user identifies each chord or plays along. |
+| **Harmonic Analysis** | Identify chord function in key (I, IV, V, etc.) | Add key context to chord mode; ask "What is the function of this chord in C major?" |
+| **Export / Sync Progress** | Backup/restore practice data to JSON or cloud | Add "Export Data" / "Import Data" buttons; optionally sync to Firebase/GitHub Gist via PAT. |
+| **Teacher Dashboard** | Instructor view of student progress | Separate admin mode; read-only view of shared practice data via invite links; requires backend or shared storage. |
+
+### 📋 Implementation Notes
+- **No build step** — all additions must work as static ES modules on Vercel
+- **Backward compatible** — new features behind feature flags or progressive enhancement
+- **Performance first** — lazy-load heavy libs (VexFlow, Chart.js, aubio) only when mode activated
+- **Mobile parity** — every desktop feature must work on iOS Safari / Chrome Android
+
+---
+
 Built with ☕ and 🎹 for piano learners everywhere.

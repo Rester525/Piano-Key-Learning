@@ -316,6 +316,66 @@ function setupEventListeners() {
 
   // Instrument radios
   setupInstrumentRadios(handleInstrumentChange);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleKeyboardShortcut);
+}
+
+function handleKeyboardShortcut(e) {
+  // Don't trigger shortcuts when typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  switch (e.key) {
+    case ' ':
+    case 'Enter':
+      // Play Again
+      if (document.getElementById('playAgainBtn').style.display !== 'none') {
+        e.preventDefault();
+        handlePlayAgain();
+      }
+      break;
+    case 'ArrowLeft':
+      // Previous group (Note Reading mode)
+      if (activeMode === 'noteReading') {
+        e.preventDefault();
+        // Could implement group navigation here
+      }
+      break;
+    case 'ArrowRight':
+      // Next group (Note Reading mode)
+      if (activeMode === 'noteReading') {
+        e.preventDefault();
+        // Could implement group navigation here
+      }
+      break;
+    case 'Escape':
+      // Close sidebar on mobile
+      if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.add('collapsed');
+      }
+      break;
+    case 't':
+    case 'T':
+      // Toggle theme
+      document.getElementById('themeToggle').click();
+      break;
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+      // Chord quality shortcuts (Chords mode)
+      if (activeMode === 'chords' && getState() === State.QUESTION_ACTIVE) {
+        const qualities = ['major', 'minor', 'diminished', 'augmented', 'dom7', 'maj7'];
+        const idx = Number(e.key) - 1;
+        if (qualities[idx]) {
+          const btn = document.querySelector(`.chord-btn[data-quality="${qualities[idx]}"]`);
+          if (btn) handleChordAnswer(qualities[idx], btn);
+        }
+      }
+      break;
+  }
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────

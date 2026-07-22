@@ -244,3 +244,234 @@ This section captures ideas discussed during development and their implementatio
 ---
 
 Built with ☕ and 🎹 for piano learners everywhere.
+
+## Usage Guide
+
+### Keyboard Shortcuts
+| Key | Action |
+|-----|--------|
+| `Space` / `Enter` | Play Again (when visible) |
+| `←` / `→` | Previous / Next group (Note Reading) |
+| `1`–`6` | Select chord quality (Chords mode) |
+| `Esc` | Close sidebar (mobile) |
+| `T` | Toggle theme |
+
+### Mode Walkthrough
+
+#### Note Reading
+1. A note name appears (e.g., `C#4`, `F3`)
+2. Tap the matching key on the on-screen piano
+3. Correct → green highlight + pleasant cadence; Wrong → red highlight + diminished resolution
+4. Next question auto-advances after ~1.5s
+
+#### Ear Training
+1. Press **Play Again** (🔊) to hear the target note
+2. Tap the key you think you heard
+3. Same feedback as Note Reading
+4. Use **Play Again** as many times as needed
+
+#### Intervals
+1. Hear two notes: root + interval (700ms gap)
+2. Prompt shows root note (e.g., `From C4, tap the note you hear`)
+3. Tap the target note
+4. Feedback includes interval name (e.g., `Perfect 5th — Brilliant!`)
+
+#### Chords
+1. Hear a full chord (all tones played with 20ms stagger)
+2. Six quality buttons appear: Major, Minor, Dim, Aug, Dom7, Maj7
+3. Tap the quality you heard
+4. Wrong answer reveals correct button in green
+
+#### Speed Run
+1. 60-second countdown starts immediately
+2. Same as Note Reading but faster pace (800ms between questions)
+3. Timer shows in score card (red when <10s)
+4. Final screen shows score + streak; tap any mode to restart
+
+### Touch / Mobile
+- Tap keys normally — `touchstart` with `preventDefault()` prevents scroll/zoom
+- Sidebar opens via ☰ button (top-left); closes on outside tap
+- Piano horizontally scrolls on narrow screens
+
+---
+
+## Architecture Deep-Dive
+
+### Module Dependency Graph
+```
+index.html
+  └── src/app.js (entry)
+       ├── src/engine.js (constants, FSM, practice model, groups, medals, speed run)
+       ├── src/audio.js (AudioContext, voices, playback helpers)
+       ├── src/keyboard.js (DOM builder, highlight/press)
+       ├── src/ui.js (DOM updates, sidebar, theme, timers)
+       └── src/modes/modes.js (5 mode implementations)
+```
+
+### Data Flow
+```
+User Interaction
+      │
+      ▼
+handleKeyAnswer() / handleChordAnswer()
+      │
+      ├──▶ Audio Feedback (playDing, cadences)
+      ├──▶ Visual Feedback (highlightAnswer, setQuestionNote)
+      ├──▶ Practice Model Update (recordAttempt)
+      ├──▶ Score Update (updateScore)
+      └──▶ Schedule Next Question (scheduleTimer → mode.startXxxMode)
+```
+
+### FSM State Diagram
+```
+                    ┌─────────────────┐
+                    │      IDLE       │
+                    │ (mode switch,   │
+                    │  noteType change)│
+                    └────────┬────────┘
+                             │ transition(QUESTION_ACTIVE)
+                             ▼
+                    ┌─────────────────┐
+         ┌──────────│ QUESTION_ACTIVE │──────────┐
+         │          │ (await answer)  │          │
+         │          └────────┬────────┘          │
+         │                   │ handleAnswer()    │
+         │                   ▼                   │
+         │          ┌─────────────────┐          │
+         │          │ ANSWER_PENDING  │          │
+         │          │ (audio playing, │          │
+         │          │  highlights on) │          │
+         │          └────────┬────────┘          │
+         │                   │ scheduleTimer     │
+         │                   ▼                   │
+         │          ┌─────────────────┐          │
+         └──────────│   (back to      │◀─────────┘
+                    │ QUESTION_ACTIVE)│
+                    └─────────────────┘
+
+All states: transition() clears ALL pendingTimers atomically
+```
+
+### Practice Model (Weighted Selection)
+```
+practiceModel = Map<key, {attempts, correct, lastSeen}>
+
+key = semitone (notes/intervals) OR qualityKey (chords)
+
+weight(key) = 1 / (1 + successRate * 4)
+  successRate = correct / attempts
+  never-seen → 1.0
+  50% → 0.33
+  100% → 0.2
+
+weightedPick(keys, avoidKey):
+  weights = keys.map(weight)
+  if key === avoidKey → weight = 0
+  random weighted selection
+```
+
+### Shuffle-Bag Group Rotation
+```
+GROUPS = [cde, fgab, cdefgab, fgabcde]  // indices 0,1,2,3
+
+pickNextGroup():
+  if bag empty or exhausted:
+    bag = fisherYatesShuffle([0,1,2,3])
+    if bag[0] === lastPicked: swap with random other
+    index = 0
+  return GROUPS[bag[index++]]
+```
+
+### Audio Voice Lifecycle
+```
+createVoice(config)
+  │
+  ├─▶ OscillatorNode + GainNode
+  ├─▶ Envelope: attack(≥5ms) → decay → sustain → release
+  ├─▶ osc.onended = () => { gain.disconnect(); osc.disconnect(); }
+  ├─▶ osc.start(t); osc.stop(t + duration + 0.1)
+  └─▶ returns {osc, gain} (discardable)
+```
+
+---
+
+## Contributing Guide
+
+### Code Style
+- **ES2022 modules** — `import`/`export`, no bundler
+- **2-space indent**, semicolons, single quotes
+- **CSS**: BEM-ish classes (`.keyboard-wrap`, `.white-key`, `.chord-btn`), custom properties for all colors/spacing
+- **No external deps** — vanilla JS + Web Audio only (heavy libs lazy-loaded only when needed)
+
+### Adding a Feature
+1. Create branch: `git checkout -b feat/your-feature`
+2. Implement in appropriate module(s)
+3. Test locally: `python3 -m http.server 8000`
+4. Verify no console errors in Chrome, Firefox, Safari
+5. Ensure mobile works (touch, sidebar, scroll)
+6. PR with description of changes + screenshots if UI
+
+### PR Process
+1. Push branch, open PR against `main`
+2. CI: Vercel preview deploy auto-runs
+3. Review: at least one approval
+4. Squash merge to `main` (auto-deploys to production)
+
+### Issue Templates
+- **Bug Report** — steps to reproduce, browser/OS, console errors
+- **Feature Request** — use case, proposed API/UI, phase (1–4)
+- **Accessibility** — WCAG criterion, screen reader behavior
+
+---
+
+## Changelog
+
+### v1.0.0 (2026-07-22)
+- Initial release
+- 5 modes: Note Reading, Ear Training, Intervals, Chords, Speed Run
+- Weighted practice algorithm + shuffle-bag groups
+- FSM state machine with timer cleanup
+- Self-cleaning Web Audio voices (3 timbres)
+- Dark/Light theme, PWA manifest, Vercel config
+- Mobile-first responsive design
+
+---
+
+## FAQ / Troubleshooting
+
+### Audio doesn't play
+- **First interaction required** — click/tap anywhere on page to unlock AudioContext (browser policy)
+- **iOS Safari** — must tap a key or Play Again; silent mode switch mutes Web Audio
+- **Check console** — `AudioContext` errors appear in DevTools
+
+### Keyboard not visible
+- **Horizontal scroll** — on narrow screens, swipe the piano area left/right
+- **Note Type = "Whole"** — black keys hidden; switch to "Sharps", "Flats", or "All"
+
+### Score/Streak not saving
+- Data is **in-memory only** per session
+- Refresh resets everything (by design for v1)
+- Phase 1 roadmap: Statistics Dashboard with `localStorage` persistence
+
+### PWA not installing
+- **HTTPS required** — Vercel provides this
+- **Must visit twice** — `beforeinstallprompt` fires on 2nd visit
+- **iOS** — use Share → Add to Home Screen (no auto-prompt)
+
+### MIDI not working
+- **Not implemented yet** — Phase 1 roadmap
+- **Safari** — no `navigator.requestMIDIAccess` support
+- **Workaround** — use computer keyboard mapping (planned) or on-screen piano
+
+### Performance issues
+- **Heavy libs lazy-load** — VexFlow, Chart.js, aubio only load when mode activated
+- **Voice cleanup** — every oscillator disconnects on `onended`
+- **No memory leaks** — FSM cancels all timers on state change
+
+### Development server CORS errors
+- Use `npx vercel dev` instead of `python -m http.server` for ES module imports
+- Or serve from project root with `npx serve`
+
+---
+
+Built with ☕ and 🎹 for piano learners everywhere.

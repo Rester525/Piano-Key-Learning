@@ -1,17 +1,22 @@
 // ═══════════════════════════════════════════════════════════════════
-// AUDIO — Web Audio API with Self-Cleaning Voices
+// AUDIO — Web Audio API with Pre-Rendered Waveform Buffers
+// Uses AudioBufferSourceNode + playbackRate instead of OscillatorNode
+// to eliminate per-note allocation overhead and GC pressure.
 // ═══════════════════════════════════════════════════════════════════
 
-import { semitoneToFreq } from './engine.js';
+import { semitoneToFreq, CHORD_QUALITIES } from './engine.js';
 
 // AudioContext — lazy init to avoid autoplay policy issues
 let AC = null;
 let currentInstrument = 'sine';
 
 function getAudioContext() {
-  if (!AC) {
+  // Recreate if context was closed (tab background / system sleep)
+  if (!AC || AC.state === 'closed') {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     AC = new Ctor();
+    // Invalidate waveform cache so it rebuilds against the new context
+    waveformBuffers = null;
     // Resume on first interaction (required by Safari/iOS)
     const resume = () => {
       if (AC.state === 'suspended') AC.resume();
@@ -32,15 +37,44 @@ export function getInstrument() {
   return currentInstrument;
 }
 
+// ─── PRE-RENDERED WAVEFORM BUFFERS ──────────────────────────────────
+
+let waveformBuffers = null; // { sine: AudioBuffer, triangle: AudioBuffer, sawtooth: AudioBuffer }
+const VOICE_BUFFER_DURATION = 1; // 1-second buffers — any frequency via playbackRate
+
+function ensureWaveformBuffers() {
+  if (waveformBuffers) return waveformBuffers;
+  const ctx = getAudioContext();
+  const sampleRate = ctx.sampleRate;
+  const len = VOICE_BUFFER_DURATION * sampleRate;
+
+  const makeBuffer = (phaseFn) => {
+    const buf = ctx.createBuffer(1, len, sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      data[i] = phaseFn(i / len);
+    }
+    return buf;
+  };
+
+  waveformBuffers = {
+    sine:     makeBuffer((p) => Math.sin(2 * Math.PI * p)),
+    triangle: makeBuffer((p) => 2 * Math.abs(2 * (p - Math.floor(p + 0.5))) - 1),
+    sawtooth: makeBuffer((p) => 2 * (p - Math.floor(p + 0.5))),
+  };
+  return waveformBuffers;
+}
+
 // ─── SELF-CLEANING VOICE FACTORY ──────────────────────────────────
 
 /**
  * Create a scheduled voice that self-disconnects on completion.
- * Returns an object you can discard — GC collects nodes after onended.
+ * Uses AudioBufferSourceNode with pre-rendered waveform buffers —
+ * no per-note OscillatorNode allocation.
  *
  * config:
  *   freq: number          — oscillator frequency (Hz)
- *   type: OscillatorType  — waveform (default 'sine')
+ *   type: string          — 'sine' | 'triangle' | 'sawtooth' (mapped to buffers)
  *   startTime: number     — AudioContext.currentTime + offset
  *   duration: number      — total lifetime in seconds
  *   attack: number        — attack ramp in seconds (default 0.005, min 0.005)
@@ -52,6 +86,8 @@ export function getInstrument() {
  */
 function createVoice(config) {
   const ctx = getAudioContext();
+  ensureWaveformBuffers();
+
   const {
     freq,
     type = 'sine',
@@ -65,16 +101,25 @@ function createVoice(config) {
     destination = ctx.destination,
   } = config;
 
-  const osc = ctx.createOscillator();
+  // Map waveform type to pre-rendered buffer
+  const bufType = (type === 'triangle' || type === 'piano')  ? 'triangle'
+                : (type === 'sawtooth' || type === 'guitar') ? 'sawtooth'
+                : 'sine';
+
+  const src = ctx.createBufferSource();
+  src.buffer = waveformBuffers[bufType];
+  src.playbackRate.value = freq; // pitch = frequency
+
   const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
 
   // Enforce minimum 5ms attack ramp to prevent audible clicks
   const safeAttack = Math.max(attack, 0.005);
   const decayStart = startTime + safeAttack;
   const sustainStart = startTime + safeAttack + decay;
-  const releaseStart = startTime + duration - release;
+
+  // Guard: release must not start before sustain completes
+  const effectiveRelease = Math.min(release, Math.max(duration - safeAttack - decay - 0.001, 0.005));
+  const releaseStart = startTime + duration - effectiveRelease;
   const endTime = startTime + duration + 0.1;
 
   gain.gain.setValueAtTime(0, startTime);
@@ -83,19 +128,19 @@ function createVoice(config) {
   gain.gain.setValueAtTime(peak * sustain, releaseStart);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
-  osc.connect(gain);
+  src.connect(gain);
   gain.connect(destination);
 
-  osc.start(startTime);
-  osc.stop(endTime);
+  src.start(startTime);
+  src.stop(endTime);
 
-  // Self-cleanup: when oscillator stops, disconnect the whole chain
-  osc.onended = () => {
+  // Self-cleanup: when source stops, disconnect the whole chain
+  src.onended = () => {
     gain.disconnect();
-    osc.disconnect();
+    src.disconnect();
   };
 
-  return { osc, gain };
+  return { src, gain };
 }
 
 // ─── INSTRUMENT WAVEFORMS ──────────────────────────────────────────
@@ -109,9 +154,33 @@ function getWaveformForInstrument() {
   }
 }
 
+// ─── AUDIO-THREAD SCHEDULING ───────────────────────────────────────
+
+/**
+ * Schedule a main-thread callback to fire at ctx.currentTime + delaySeconds.
+ * Uses a silent AudioBufferSourceNode whose onended fires on the main thread.
+ */
+export function scheduleAtAudioTime(ctx, delaySeconds, callback) {
+  ensureWaveformBuffers();
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  gain.gain.value = 0; // silent
+  src.buffer = waveformBuffers.sine; // arbitrary — won't be heard
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.onended = () => {
+    gain.disconnect();
+    src.disconnect();
+    callback();
+  };
+  const now = ctx.currentTime;
+  src.start(now + delaySeconds);
+  src.stop(now + delaySeconds + 0.01);
+}
+
 // ─── HIGH-LEVEL AUDIO FUNCTIONS ────────────────────────────────────
 
-/** Simple sine ding — the immediate feedback on key press. */
+/** Simple ding — the immediate feedback on key press. */
 export function playDing(semitone, vol = 0.5) {
   const ctx = getAudioContext();
   const t = ctx.currentTime;
@@ -198,12 +267,13 @@ export function intervalsPlayAudio(rootSemitone, targetSemitone, scheduleTimer) 
 }
 
 /** Play all chord tones with 20ms stagger — each voice self-cleans */
-export async function playChord(rootSemitone, qualityKey) {
-  const { CHORD_QUALITIES } = await import('./engine.js');
+export function playChord(rootSemitone, qualityKey) {
   const ctx = getAudioContext();
   const q = CHORD_QUALITIES[qualityKey];
   if (!q) return;
-  if (ctx.state === 'suspended') await ctx.resume();
+  // ensureAudioContext() is called by mode handlers before playback;
+  // ctx.resume() here is fire-and-forget for direct callers
+  if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;
   const vol = 0.35 / q.semis.length;
   q.semis.forEach((semi, i) => {

@@ -6,6 +6,7 @@ import { State, transition, getState, scheduleTimer, clearAllTimers,
          GROUPS, pickNextGroup, getPlayableSemis, weightedPick,
          semitoneToDisplay, practiceModel, recordAttempt,
          MEDALS, getMedal, nextMilestone,
+         INTERVAL_NAMES, CHORD_QUALITIES, CHROMATIC,
          startSpeedRunTimer, stopSpeedRunTimer, getSpeedRunTimeLeft } from './engine.js';
 
 import { playDing, playMajorEnsemble, playMinorEnsemble, playPerfectCadence,
@@ -81,6 +82,9 @@ const context = {
   MEDALS,
   getMedal,
   nextMilestone,
+  INTERVAL_NAMES,
+  CHORD_QUALITIES,
+  CHROMATIC,
   startSpeedRunTimer,
   stopSpeedRunTimer,
   getSpeedRunTimeLeft,
@@ -151,7 +155,7 @@ async function switchMode(newMode) {
       showPlayAgain(true);
       setQuestionNote('🔊');
       currentGroup = GROUPS[2];
-      buildKeyboard(currentGroup);
+      buildKeyboard(currentGroup, noteType);
       scheduleTimer(() => startEarTrainingMode(context), 400);
       break;
     case 'intervals':
@@ -177,12 +181,12 @@ async function switchMode(newMode) {
       showPlayAgain(false);
       setKeyboardLocked(true);
       currentGroup = GROUPS[2];
-      buildKeyboard(currentGroup);
+      buildKeyboard(currentGroup, noteType);
       break;
   }
 }
 
-function handleNoteTypeChange() {
+function handleNoteTypeChange(newNoteType) {
   clearAllTimers();
   stopSpeedRunTimer();
   transition(State.IDLE);
@@ -190,13 +194,16 @@ function handleNoteTypeChange() {
   streak = 0;
   updateScore(0, 0);
 
+  // Update the note type state
+  noteType = newNoteType;
+
   switch (activeMode) {
     case 'noteReading':
       startNoteReadingMode(context);
       break;
     case 'earTraining':
       currentGroup = GROUPS[2];
-      buildKeyboard(currentGroup);
+      buildKeyboard(currentGroup, noteType);
       scheduleTimer(() => startEarTrainingMode(context), 300);
       break;
     case 'intervals':
@@ -210,7 +217,7 @@ function handleNoteTypeChange() {
       break;
     default:
       currentGroup = GROUPS[2];
-      buildKeyboard(currentGroup);
+      buildKeyboard(currentGroup, noteType);
       break;
   }
 }
@@ -221,10 +228,25 @@ function handleInstrumentChange(instrument) {
 
 // ─── ANSWER HANDLING ───────────────────────────────────────────────
 
+// Debounce guard: prevent click+touchstart double-fire on mobile
+let _lastKeyTimestamp = 0;
+let _lastKeySemitone = null;
+
+function handleKeyClick(chosenSemitone, keyEl) {
+  const now = Date.now();
+  if (chosenSemitone === _lastKeySemitone && now - _lastKeyTimestamp < 300) return;
+  _lastKeyTimestamp = now;
+  _lastKeySemitone = chosenSemitone;
+  handleKeyAnswer(chosenSemitone, keyEl);
+}
+
 function handleKeyAnswer(chosenSemitone, keyEl) {
   // Chord mode: keyboard acts as hint — play note, don't score
   if (activeMode === 'chords') {
-    playDing(chosenSemitone);
+    const st = getState();
+    if (st === State.QUESTION_ACTIVE || st === State.ANSWER_PENDING) {
+      playDing(chosenSemitone);
+    }
     return;
   }
 
@@ -258,8 +280,10 @@ function handleChordAnswer(qualityKey, btnEl) {
 // ─── PLAY AGAIN / REPLAY ───────────────────────────────────────────
 
 function handlePlayAgain() {
+  const modeAtClick = activeMode;
   ensureAudioContext().then(() => {
-    switch (activeMode) {
+    if (activeMode !== modeAtClick) return;
+    switch (modeAtClick) {
       case 'intervals':
         replayIntervals(context);
         break;
@@ -283,7 +307,7 @@ function setupEventListeners() {
   document.addEventListener('click', (e) => {
     const key = e.target.closest('.white-key, .black-key.clickable');
     if (key && key.dataset.semitone) {
-      handleKeyAnswer(Number(key.dataset.semitone), key);
+      handleKeyClick(Number(key.dataset.semitone), key);
     }
   });
 
@@ -292,7 +316,7 @@ function setupEventListeners() {
     const key = e.target.closest('.white-key, .black-key.clickable');
     if (key && key.dataset.semitone) {
       e.preventDefault();
-      handleKeyAnswer(Number(key.dataset.semitone), key);
+      handleKeyClick(Number(key.dataset.semitone), key);
     }
   }, { passive: false });
 
@@ -328,10 +352,13 @@ function handleKeyboardShortcut(e) {
   switch (e.key) {
     case ' ':
     case 'Enter':
-      // Play Again
+      // Play Again — respect FSM state guard
       if (document.getElementById('playAgainBtn').style.display !== 'none') {
-        e.preventDefault();
-        handlePlayAgain();
+        const st = getState();
+        if (st === State.QUESTION_ACTIVE || st === State.ANSWER_PENDING) {
+          e.preventDefault();
+          handlePlayAgain();
+        }
       }
       break;
     case 'ArrowLeft':
@@ -378,13 +405,34 @@ function handleKeyboardShortcut(e) {
   }
 }
 
+// ─── MIDI INPUT ─────────────────────────────────────────────────────
+
+function setupMIDI() {
+  if (!navigator.requestMIDIAccess) return;
+  navigator.requestMIDIAccess().then(midi => {
+    midi.inputs.forEach(input => {
+      input.onmidimessage = (msg) => {
+        const [status, note, velocity] = msg.data;
+        // Note On (0x90 + channel 0-15, velocity > 0)
+        if (status >= 0x90 && status <= 0x9F && velocity > 0) {
+          const appSemi = note - 12; // MIDI middle C=60 → app C4=48
+          const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
+          handleKeyAnswer(appSemi, keyEl);
+        }
+      };
+    });
+  }).catch(() => {
+    // Safari, mobile, or permission denied — silent fail
+  });
+}
+
 // ─── INIT ──────────────────────────────────────────────────────────
 
 async function init() {
+  // initUI already calls setupSidebar() and setupThemeToggle() internally
   initUI();
   setupEventListeners();
-  setupSidebar();
-  setupThemeToggle();
+  setupMIDI();
 
   // Initial mode
   await switchMode('noteReading');

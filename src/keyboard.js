@@ -5,7 +5,7 @@
 import { GROUPS, BLACK_PAIRS, BLACK_SEMI_MAP, semitoneToDisplay, CHROMATIC } from './engine.js';
 
 /** Build the piano keyboard for a given group and note type. */
-export function buildKeyboard(group, noteType, onKeyClick) {
+export function buildKeyboard(group, noteType) {
   const keyboard = document.getElementById('keyboard');
   keyboard.innerHTML = '';
 
@@ -17,11 +17,6 @@ export function buildKeyboard(group, noteType, onKeyClick) {
     const wk = document.createElement('div');
     wk.className = 'white-key';
     wk.dataset.semitone = semi;
-    wk.addEventListener('click', () => onKeyClick(semi, wk));
-    wk.addEventListener('touchstart', (e) => {
-      e.preventDefault(); // Critical for iOS Safari
-      onKeyClick(semi, wk);
-    }, { passive: false });
     keyboard.appendChild(wk);
 
     // Black key (if applicable)
@@ -35,11 +30,6 @@ export function buildKeyboard(group, noteType, onKeyClick) {
           bk.classList.add('clickable');
           const blackSemi = semis[i] + (BLACK_SEMI_MAP[pair] - (semis[i] % 12));
           bk.dataset.semitone = blackSemi;
-          bk.addEventListener('click', () => onKeyClick(blackSemi, bk));
-          bk.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            onKeyClick(blackSemi, bk);
-          }, { passive: false });
         }
         bk.style.left = `${(i + 1) * 52 - 16}px`;
         keyboard.appendChild(bk);

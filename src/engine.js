@@ -36,7 +36,7 @@ export const CHROMATIC = {
 };
 
 // Black-key pairs: white-key indices where a black key sits between them.
-const BLACK_PAIRS = new Set([
+export const BLACK_PAIRS = new Set([
   [0,2].join(','),   // C→D  (C#/Db)
   [2,4].join(','),   // D→E  (D#/Eb)
   [5,7].join(','),   // F→G  (F#/Gb)
@@ -45,7 +45,7 @@ const BLACK_PAIRS = new Set([
 ]);
 
 // Black-key semitone values for each white-key pair
-const BLACK_SEMI_MAP = {
+export const BLACK_SEMI_MAP = {
   '0,2': 1,   // C#/Db
   '2,4': 3,   // D#/Eb
   '5,7': 6,   // F#/Gb
@@ -193,6 +193,7 @@ export function weightedPick(keys, avoidKey) {
 
 let groupBag = [];   // shuffled pool of group indices
 let groupBagIdx = 0;
+let lastPickedIdx = -1; // track last picked across cycles for no-repeat
 
 /** Return the next group, ensuring full-cycle fairness and no consecutive repeats. */
 export function pickNextGroup() {
@@ -205,17 +206,15 @@ export function pickNextGroup() {
       [groupBag[i], groupBag[j]] = [groupBag[j], groupBag[i]];
     }
     // Ensure first item of new bag ≠ last item of previous cycle
-    if (groupBagIdx > 0 && groupBag.length > 1) {
-      const lastPicked = groupBag[groupBagIdx - 1];
-      if (groupBag[0] === lastPicked) {
-        // Swap first with any other
-        const swapIdx = 1 + Math.floor(Math.random() * (groupBag.length - 1));
-        [groupBag[0], groupBag[swapIdx]] = [groupBag[swapIdx], groupBag[0]];
-      }
+    if (lastPickedIdx >= 0 && groupBag.length > 1 && groupBag[0] === lastPickedIdx) {
+      // Swap first with any other
+      const swapIdx = 1 + Math.floor(Math.random() * (groupBag.length - 1));
+      [groupBag[0], groupBag[swapIdx]] = [groupBag[swapIdx], groupBag[0]];
     }
     groupBagIdx = 0;
   }
   const gIdx = groupBag[groupBagIdx++];
+  lastPickedIdx = gIdx;
   return GROUPS[gIdx];
 }
 
@@ -234,27 +233,47 @@ export const nextMilestone = (s) => (MEDALS.find(m => m.at > s) || MEDALS[MEDALS
 
 // ─── SPEED RUN ─────────────────────────────────────────────────────
 
-export let speedRunTimer = null;
+export let speedRunStartTime = null;
 export let speedRunTimeLeft = 60;
+let speedRunRAF = null;
+let speedRunOnTick = null;
+let speedRunOnEnd = null;
+
+function speedRunTick() {
+  const elapsed = (performance.now() - speedRunStartTime) / 1000;
+  const remaining = Math.ceil(60 - elapsed);
+  if (remaining <= 0) {
+    speedRunTimeLeft = 0;
+    speedRunOnTick(0);
+    const end = speedRunOnEnd;
+    stopSpeedRunTimer();
+    end();
+    return;
+  }
+  if (remaining !== speedRunTimeLeft) {
+    speedRunTimeLeft = remaining;
+    speedRunOnTick(remaining);
+  }
+  speedRunRAF = requestAnimationFrame(speedRunTick);
+}
 
 export function startSpeedRunTimer(onTick, onEnd) {
+  stopSpeedRunTimer();
+  speedRunStartTime = performance.now();
   speedRunTimeLeft = 60;
-  speedRunTimer = setInterval(() => {
-    speedRunTimeLeft--;
-    onTick(speedRunTimeLeft);
-    if (speedRunTimeLeft <= 0) {
-      clearInterval(speedRunTimer);
-      speedRunTimer = null;
-      onEnd();
-    }
-  }, 1000);
+  speedRunOnTick = onTick;
+  speedRunOnEnd = onEnd;
+  speedRunRAF = requestAnimationFrame(speedRunTick);
 }
 
 export function stopSpeedRunTimer() {
-  if (speedRunTimer) {
-    clearInterval(speedRunTimer);
-    speedRunTimer = null;
+  if (speedRunRAF) {
+    cancelAnimationFrame(speedRunRAF);
+    speedRunRAF = null;
   }
+  speedRunStartTime = null;
+  speedRunOnTick = null;
+  speedRunOnEnd = null;
 }
 
 export function getSpeedRunTimeLeft() {

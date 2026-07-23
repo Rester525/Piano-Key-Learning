@@ -2,22 +2,23 @@
 // MODES — Game Mode Implementations
 // ══════════════════════════════════════════════════════════════════
 
-import { GROUPS, semitoneToDisplay, INTERVAL_NAMES, CHORD_QUALITIES, CHROMATIC } from '../../engine.js';
+import { GROUPS, semitoneToDisplay, INTERVAL_NAMES, CHORD_QUALITIES, CHROMATIC } from '../engine.js';
 
 // ─── NOTE READING MODE ────────────────────────────────────────────
 
 export async function startNoteReadingMode(context) {
-  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis, recordAttempt, practiceModel, pickNextGroup, playDing, playMajorEnsemble, playMinorEnsemble, ensureAudioContext } = context;
+  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis,
+          pickNextGroup, buildKeyboard, clearHighlights, clearFeedback, setQuestionNote } = context;
 
   transition(State.QUESTION_ACTIVE);
-  context.clearHighlights();
+  clearHighlights();
 
   const group = pickNextGroup();
   context.currentGroup = group;
-  context.buildKeyboard(group);
+  buildKeyboard(group, noteType);
 
-  context.clearFeedback();
-  context.setQuestionNote('?');
+  clearFeedback();
+  setQuestionNote('?');
 
   const pool = getPlayableSemis(group, noteType);
   if (pool.length === 0) {
@@ -27,13 +28,16 @@ export async function startNoteReadingMode(context) {
   const next = weightedPick(pool, context.currentSemitone);
   context.currentSemitone = next;
 
-  context.setQuestionNote(semitoneToDisplay(context.currentSemitone, noteType));
+  setQuestionNote(semitoneToDisplay(context.currentSemitone, noteType));
 }
 
 export async function handleNoteReadingAnswer(context, chosenSemitone, keyEl) {
-  const { noteType, fsmState, State, transition, scheduleTimer, semitoneToDisplay, recordAttempt, updateScore, currentSemitone, activeMode } = context;
+  const { noteType, getState, State, transition, scheduleTimer, semitoneToDisplay,
+          recordAttempt, updateScore, currentSemitone, activeMode,
+          ensureAudioContext, playDing, playMajorEnsemble, playMinorEnsemble,
+          pressKey, highlightAnswer, setQuestionNote, setFeedback } = context;
 
-  if (fsmState !== State.QUESTION_ACTIVE) return;
+  if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
   const correct = chosenSemitone === currentSemitone;
@@ -46,20 +50,20 @@ export async function handleNoteReadingAnswer(context, chosenSemitone, keyEl) {
     else playMinorEnsemble(chosenSemitone);
   }, 200);
 
-  context.pressKey(keyEl);
-  context.highlightAnswer(currentSemitone, chosenSemitone, correct);
+  pressKey(keyEl);
+  highlightAnswer(currentSemitone, chosenSemitone, correct);
 
-  context.setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
+  setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
 
   if (correct) {
     const praise = ['Brilliant! ✨','Perfect! 🎵','Nice work! 🌟','Excellent! 🎶','Keep it up! 🔥','Superb! 🎼'];
-    context.setFeedback(praise[Math.floor(Math.random() * praise.length)], 'correct');
+    setFeedback(praise[Math.floor(Math.random() * praise.length)], 'correct');
     context.score++;
     context.streak++;
   } else {
     const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const correctDisplay = semitoneToDisplay(currentSemitone, noteType);
-    context.setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
+    setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
     context.streak = 0;
   }
 
@@ -75,17 +79,19 @@ export async function handleNoteReadingAnswer(context, chosenSemitone, keyEl) {
 // ─── EAR TRAINING MODE ────────────────────────────────────────────
 
 export async function startEarTrainingMode(context) {
-  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis, currentGroup, buildKeyboard, playDing, ensureAudioContext } = context;
+  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis,
+          buildKeyboard, clearHighlights, clearFeedback, setQuestionNote, setFeedback,
+          playDing, ensureAudioContext } = context;
 
   transition(State.QUESTION_ACTIVE);
-  context.clearHighlights();
+  clearHighlights();
 
   context.currentGroup = GROUPS[2];
-  buildKeyboard(context.currentGroup);
+  buildKeyboard(context.currentGroup, noteType);
 
-  context.clearFeedback();
-  context.setQuestionNote('🔊');
-  context.setFeedback('Tap the key you heard');
+  clearFeedback();
+  setQuestionNote('🔊');
+  setFeedback('Tap the key you heard');
 
   const pool = getPlayableSemis(context.currentGroup, noteType);
   const next = weightedPick(pool, context.currentSemitone);
@@ -96,9 +102,12 @@ export async function startEarTrainingMode(context) {
 }
 
 export async function handleEarTrainingAnswer(context, chosenSemitone, keyEl) {
-  const { noteType, fsmState, State, transition, scheduleTimer, semitoneToDisplay, recordAttempt, updateScore, currentSemitone, activeMode, playDing, playPerfectCadence, playDiminishedResolution, ensureAudioContext } = context;
+  const { noteType, getState, State, transition, scheduleTimer, semitoneToDisplay,
+          recordAttempt, updateScore, currentSemitone, activeMode,
+          ensureAudioContext, playDing, playPerfectCadence, playDiminishedResolution,
+          pressKey, highlightAnswer, setQuestionNote, setFeedback } = context;
 
-  if (fsmState !== State.QUESTION_ACTIVE) return;
+  if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
   const correct = chosenSemitone === currentSemitone;
@@ -111,21 +120,21 @@ export async function handleEarTrainingAnswer(context, chosenSemitone, keyEl) {
     else playDiminishedResolution();
   }, 200);
 
-  context.pressKey(keyEl);
-  context.highlightAnswer(currentSemitone, chosenSemitone, correct);
+  pressKey(keyEl);
+  highlightAnswer(currentSemitone, chosenSemitone, correct);
 
-  context.setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
+  setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
 
   if (correct) {
     const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const praise = ['Brilliant! ✨','Perfect! 🎵','Nice work! 🌟','Excellent! 🎶','Keep it up! 🔥','Superb! 🎼'];
-    context.setFeedback(`${chosenDisplay} — ${praise[Math.floor(Math.random() * praise.length)]}`, 'correct');
+    setFeedback(`${chosenDisplay} — ${praise[Math.floor(Math.random() * praise.length)]}`, 'correct');
     context.score++;
     context.streak++;
   } else {
     const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const correctDisplay = semitoneToDisplay(currentSemitone, noteType);
-    context.setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
+    setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
     context.streak = 0;
   }
 
@@ -146,16 +155,18 @@ export function replayEarTraining(context) {
 // ─── INTERVALS MODE ────────────────────────────────────────────────
 
 export async function startIntervalsMode(context) {
-  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis, buildKeyboard, intervalsPlayAudio, ensureAudioContext } = context;
+  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis,
+          buildKeyboard, clearHighlights, clearFeedback, setQuestionNote, setPrompt,
+          semitoneToDisplay, intervalsPlayAudio, ensureAudioContext } = context;
 
   transition(State.QUESTION_ACTIVE);
-  context.clearHighlights();
+  clearHighlights();
 
   context.currentGroup = GROUPS[2];
-  buildKeyboard(context.currentGroup);
+  buildKeyboard(context.currentGroup, noteType);
 
-  context.clearFeedback();
-  context.setQuestionNote('?');
+  clearFeedback();
+  setQuestionNote('?');
 
   const pool = getPlayableSemis(context.currentGroup, noteType);
   if (pool.length < 2) {
@@ -181,17 +192,21 @@ export async function startIntervalsMode(context) {
   context.currentSemitone = target;
   context.currentInterval = interval;
 
-  context.setPrompt(`From ${semitoneToDisplay(root, noteType)}, tap the note you hear`);
-  context.setQuestionNote(semitoneToDisplay(root, noteType));
+  setPrompt(`From ${semitoneToDisplay(root, noteType)}, tap the note you hear`);
+  setQuestionNote(semitoneToDisplay(root, noteType));
 
   await ensureAudioContext();
   intervalsPlayAudio(root, target, scheduleTimer);
 }
 
 export async function handleIntervalsAnswer(context, chosenSemitone, keyEl) {
-  const { noteType, fsmState, State, transition, scheduleTimer, semitoneToDisplay, INTERVAL_NAMES, recordAttempt, updateScore, currentSemitone, currentRootSemitone, currentInterval, activeMode, playDing, playMajorEnsemble, playMinorEnsemble, ensureAudioContext } = context;
+  const { noteType, getState, State, transition, scheduleTimer, semitoneToDisplay,
+          recordAttempt, updateScore,
+          currentSemitone, currentRootSemitone, currentInterval, activeMode,
+          ensureAudioContext, playDing, playMajorEnsemble, playMinorEnsemble,
+          pressKey, highlightAnswer, setQuestionNote, setFeedback } = context;
 
-  if (fsmState !== State.QUESTION_ACTIVE) return;
+  if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
   const correct = chosenSemitone === currentSemitone;
@@ -204,22 +219,21 @@ export async function handleIntervalsAnswer(context, chosenSemitone, keyEl) {
     else playMinorEnsemble(chosenSemitone);
   }, 200);
 
-  context.pressKey(keyEl);
-  context.highlightAnswer(currentSemitone, chosenSemitone, correct);
+  pressKey(keyEl);
+  highlightAnswer(currentSemitone, chosenSemitone, correct);
 
-  context.setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
+  setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
 
   if (correct) {
-    const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const intervalName = INTERVAL_NAMES[currentInterval] || 'Interval';
     const praise = ['Brilliant! ✨','Perfect! 🎵','Nice work! 🌟','Excellent! 🎶','Keep it up! 🔥','Superb! 🎼'];
-    context.setFeedback(`${intervalName} — ${praise[Math.floor(Math.random() * praise.length)]}`, 'correct');
+    setFeedback(`${intervalName} — ${praise[Math.floor(Math.random() * praise.length)]}`, 'correct');
     context.score++;
     context.streak++;
   } else {
     const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const correctDisplay = semitoneToDisplay(currentSemitone, noteType);
-    context.setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
+    setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
     context.streak = 0;
   }
 
@@ -240,7 +254,10 @@ export function replayIntervals(context) {
 // ─── CHORDS MODE ──────────────────────────────────────────────────
 
 export async function startChordsMode(context) {
-  const { scheduleTimer, transition, State, weightedPick, buildKeyboard, playChord, clearChordButtons, showChordButtons, ensureAudioContext } = context;
+  const { scheduleTimer, transition, State, weightedPick,
+          buildKeyboard, clearFeedback, setQuestionNote, setPrompt,
+          clearChordButtons, showChordButtons, playChord, ensureAudioContext,
+          semitoneToDisplay } = context;
 
   transition(State.QUESTION_ACTIVE);
 
@@ -248,11 +265,11 @@ export async function startChordsMode(context) {
   showChordButtons(true);
 
   context.currentGroup = GROUPS[2];
-  buildKeyboard(context.currentGroup);
+  buildKeyboard(context.currentGroup, context.noteType);
 
-  context.clearFeedback();
-  context.setQuestionNote('?');
-  context.setPrompt('What chord quality?');
+  clearFeedback();
+  setQuestionNote('?');
+  setPrompt('What chord quality?');
 
   // Full chromatic pool — chords need all 12 notes
   const pool = [];
@@ -277,16 +294,20 @@ export async function startChordsMode(context) {
   context.currentChordQuality = qualityKey;
   context.currentChordSemis = chordSemis;
 
-  context.setQuestionNote(semitoneToDisplay(root, context.noteType));
+  setQuestionNote(semitoneToDisplay(root, context.noteType));
 
   await ensureAudioContext();
   playChord(root, qualityKey);
 }
 
 export async function handleChordsAnswer(context, qualityKey, btnEl) {
-  const { fsmState, State, transition, scheduleTimer, noteType, semitoneToDisplay, CHORD_QUALITIES, recordAttempt, updateScore, currentChordQuality, currentChordSemis, activeMode, playPerfectCadence, playDiminishedResolution, ensureAudioContext, showChordButtons } = context;
+  const { getState, State, transition, scheduleTimer, noteType, semitoneToDisplay,
+          recordAttempt, updateScore,
+          currentChordQuality, currentChordSemis,
+          ensureAudioContext, playPerfectCadence, playDiminishedResolution,
+          setQuestionNote, setFeedback, showChordButtons } = context;
 
-  if (fsmState !== State.QUESTION_ACTIVE) return;
+  if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
   await ensureAudioContext();
@@ -297,9 +318,9 @@ export async function handleChordsAnswer(context, qualityKey, btnEl) {
 
   if (correct) {
     btnEl.classList.add('selected-correct');
-    context.setQuestionNote(semitoneToDisplay(context.currentRootSemitone, noteType), 'correct');
+    setQuestionNote(semitoneToDisplay(context.currentRootSemitone, noteType), 'correct');
     playPerfectCadence();
-    context.setFeedback(`${q.name} — ${noteNames} ✨`, 'correct');
+    setFeedback(`${q.name} — ${noteNames} ✨`, 'correct');
     context.score++;
     context.streak++;
   } else {
@@ -309,7 +330,7 @@ export async function handleChordsAnswer(context, qualityKey, btnEl) {
     });
     playDiminishedResolution();
     const chosenName = CHORD_QUALITIES[qualityKey]?.name || qualityKey;
-    context.setFeedback(`That's ${chosenName} — correct is ${q.name} (${noteNames})`, 'wrong');
+    setFeedback(`That's ${chosenName} — correct is ${q.name} (${noteNames})`, 'wrong');
     context.streak = 0;
   }
 
@@ -330,19 +351,23 @@ export function replayChord(context) {
 // ─── SPEED RUN MODE ───────────────────────────────────────────────
 
 export async function startSpeedRunMode(context) {
-  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis, pickNextGroup, buildKeyboard, playDing, playMajorEnsemble, playMinorEnsemble, ensureAudioContext, startSpeedRunTimer, updateSpeedRunTimer, showSpeedRunTimer } = context;
+  const { noteType, scheduleTimer, transition, State, weightedPick, getPlayableSemis,
+          pickNextGroup, buildKeyboard, clearHighlights, clearFeedback, setQuestionNote,
+          showPlayAgain, showChordButtons, showSpeedRunTimer, updateSpeedRunTimer,
+          startSpeedRunTimer, semitoneToDisplay,
+          ensureAudioContext, playDing, playMajorEnsemble, playMinorEnsemble } = context;
 
   transition(State.QUESTION_ACTIVE);
-  context.clearHighlights();
+  clearHighlights();
 
   const group = pickNextGroup();
   context.currentGroup = group;
-  buildKeyboard(group);
+  buildKeyboard(group, noteType);
 
-  context.clearFeedback();
-  context.setQuestionNote('?');
-  context.showPlayAgain(false);
-  context.showChordButtons(false);
+  clearFeedback();
+  setQuestionNote('?');
+  showPlayAgain(false);
+  showChordButtons(false);
 
   showSpeedRunTimer(true);
 
@@ -357,11 +382,12 @@ export async function startSpeedRunMode(context) {
   const next = weightedPick(pool, context.currentSemitone);
   context.currentSemitone = next;
 
-  context.setQuestionNote(semitoneToDisplay(context.currentSemitone, noteType));
+  setQuestionNote(semitoneToDisplay(context.currentSemitone, noteType));
 }
 
 function endSpeedRun(context) {
-  const { fsmState, State, transition, scheduleTimer, updateScore, score, streak, setPrompt, setFeedback, showSpeedRunTimer, stopSpeedRunTimer } = context;
+  const { State, transition, updateScore, score, streak,
+          setPrompt, setFeedback, showSpeedRunTimer, stopSpeedRunTimer } = context;
 
   transition(State.IDLE);
   stopSpeedRunTimer();
@@ -373,9 +399,13 @@ function endSpeedRun(context) {
 }
 
 export async function handleSpeedRunAnswer(context, chosenSemitone, keyEl) {
-  const { noteType, fsmState, State, transition, scheduleTimer, semitoneToDisplay, recordAttempt, updateScore, currentSemitone, activeMode, getSpeedRunTimeLeft, playDing, playMajorEnsemble, playMinorEnsemble, ensureAudioContext } = context;
+  const { noteType, getState, State, transition, scheduleTimer, semitoneToDisplay,
+          recordAttempt, updateScore, currentSemitone, activeMode,
+          getSpeedRunTimeLeft,
+          ensureAudioContext, playDing, playMajorEnsemble, playMinorEnsemble,
+          pressKey, highlightAnswer, setQuestionNote, setFeedback } = context;
 
-  if (fsmState !== State.QUESTION_ACTIVE) return;
+  if (getState() !== State.QUESTION_ACTIVE) return;
   if (getSpeedRunTimeLeft() <= 0) return;
   transition(State.ANSWER_PENDING);
 
@@ -389,20 +419,20 @@ export async function handleSpeedRunAnswer(context, chosenSemitone, keyEl) {
     else playMinorEnsemble(chosenSemitone);
   }, 200);
 
-  context.pressKey(keyEl);
-  context.highlightAnswer(currentSemitone, chosenSemitone, correct);
+  pressKey(keyEl);
+  highlightAnswer(currentSemitone, chosenSemitone, correct);
 
-  context.setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
+  setQuestionNote(semitoneToDisplay(chosenSemitone, noteType), correct ? 'correct' : 'wrong');
 
   if (correct) {
     const praise = ['Brilliant! ✨','Perfect! 🎵','Nice work! 🌟','Excellent! 🎶','Keep it up! 🔥','Superb! 🎼'];
-    context.setFeedback(praise[Math.floor(Math.random() * praise.length)], 'correct');
+    setFeedback(praise[Math.floor(Math.random() * praise.length)], 'correct');
     context.score++;
     context.streak++;
   } else {
     const chosenDisplay = semitoneToDisplay(chosenSemitone, noteType);
     const correctDisplay = semitoneToDisplay(currentSemitone, noteType);
-    context.setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
+    setFeedback(`The answer was ${correctDisplay} (you tapped ${chosenDisplay})`, 'wrong');
     context.streak = 0;
   }
 

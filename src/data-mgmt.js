@@ -4,9 +4,10 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const STORAGE_KEYS = [
-  'pkl_stats_sessions',
+  'pkl_sessions',
   'pkl_srs_data',
   'pkl_custom_sets',
+  'pkl_curriculum',
   'theme',
 ];
 

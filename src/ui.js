@@ -347,7 +347,7 @@ export function setupCurriculumPanel() {
 }
 
 function renderCurriculumLevels(container) {
-  import('../src/curriculum.js').then(({ LEVELS, getProgress }) => {
+  import('./curriculum.js').then(({ LEVELS, getProgress }) => {
     const progress = getProgress();
     container.innerHTML = '';
 

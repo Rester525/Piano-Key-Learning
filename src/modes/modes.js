@@ -372,10 +372,13 @@ export async function handleChordsAnswer(context, qualityKey, btnEl) {
   recordGradeIfSRS(currentChordQuality, correct, context);
   updateScore(context.score, context.streak);
 
+  const modeSnapshot = activeMode;
   scheduleTimer(() => {
     showChordButtons(false);
-    startChordsMode(context);
-    context.renderSheetMusic?.();
+    if (modeSnapshot === 'chords') {
+      startChordsMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 2000);
 }
 

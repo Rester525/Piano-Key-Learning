@@ -4,7 +4,7 @@
 
 import { getSupabase } from './supabase.js';
 
-const STATS_KEY = 'pkl_stats_sessions';
+const STATS_KEY = 'pkl_sessions';
 const SRS_KEY = 'pkl_srs_data';
 const SETS_KEY = 'pkl_custom_sets';
 const CURRICULUM_KEY = 'pkl_curriculum';

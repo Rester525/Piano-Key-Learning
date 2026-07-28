@@ -513,7 +513,7 @@ function handleKeyboardShortcut(e) {
     case 't':
     case 'T':
       // Toggle theme
-      document.getElementById('themeToggle').click();
+      document.getElementById('topBarThemeToggle').click();
       break;
     case '1':
     case '2':

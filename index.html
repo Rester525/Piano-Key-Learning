@@ -17,10 +17,32 @@
 
 <div class="app-layout">
 
-  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <header class="top-bar" id="topBar">
+    <button class="hamburger-btn" id="topBarToggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="top-bar-title">Piano Key Learning</span>
+    <div class="top-bar-right">
+      <select id="topBarInstrument" class="top-bar-select">
+        <option value="sine">Sine</option>
+        <option value="piano">Piano</option>
+        <option value="guitar">Guitar</option>
+      </select>
+      <button class="top-bar-theme-btn" id="topBarThemeToggle" title="Toggle dark/light mode">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="top-bar-login-btn" id="topBarLogin" title="Log in or sign up">Log In</button>
+      <div class="top-bar-user-menu" id="topBarUserMenu" style="display:none">
+        <span class="top-bar-user-email" id="topBarUserEmail"></span>
+        <button class="top-bar-logout-btn" id="topBarLogoutBtn" title="Log out">Log Out</button>
+      </div>
+    </div>
+  </header>
+
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-logo">🎹 Settings</span>
+      <span class="sidebar-logo">⚙️ Settings</span>
       <button class="sidebar-close" id="sidebarClose" title="Close sidebar" aria-label="Close sidebar">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/></svg>
       </button>
@@ -28,99 +50,62 @@
 
     <fieldset class="sidebar-section">
       <legend>Training Mode</legend>
-      <label class="sidebar-radio">
-        <input type="radio" name="trainingMode" value="noteReading" checked>
-        Note Reading
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="trainingMode" value="earTraining">
-        Ear Training
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="trainingMode" value="intervals">
-        Intervals
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="trainingMode" value="chords">
-        Chords
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="trainingMode" value="speedRun">
-        Speed Run
-      </label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="noteReading" checked>Note Reading</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="earTraining">Ear Training</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="intervals">Intervals</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="chords">Chords</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="speedRun">Speed Run</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="keyboard">🎹 Keyboard</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="curriculum">🎓 Curriculum</label>
     </fieldset>
 
     <fieldset class="sidebar-section">
       <legend>Note Type</legend>
-      <label class="sidebar-radio">
-        <input type="radio" name="noteType" value="whole" checked>
-        Whole
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="noteType" value="sharps">
-        ♯ Sharps
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="noteType" value="flats">
-        ♭ Flats
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="noteType" value="all">
-        All
-      </label>
+      <label class="sidebar-radio"><input type="radio" name="noteType" value="whole" checked>Whole</label>
+      <label class="sidebar-radio"><input type="radio" name="noteType" value="sharps">♯ Sharps</label>
+      <label class="sidebar-radio"><input type="radio" name="noteType" value="flats">♭ Flats</label>
+      <label class="sidebar-radio"><input type="radio" name="noteType" value="all">All</label>
     </fieldset>
 
     <fieldset class="sidebar-section">
-      <legend>Instrument</legend>
-      <label class="sidebar-radio">
-        <input type="radio" name="instrument" value="sine" checked>
-        Sine
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="instrument" value="piano">
-        Piano
-      </label>
-      <label class="sidebar-radio">
-        <input type="radio" name="instrument" value="guitar">
-        Guitar
-      </label>
+      <legend>Practice Set</legend>
+      <select id="practiceSetSelect" class="sidebar-select">
+        <option value="">— Auto (all) —</option>
+      </select>
+      <span class="add-link" id="openCustomSetEditor">+ add custom set</span>
     </fieldset>
 
-    <button class="sidebar-toggle-theme" id="themeToggle" title="Toggle dark/light mode">
-      <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    </button>
+    <fieldset class="sidebar-section">
+      <legend>Learning Method</legend>
+      <label class="sidebar-radio"><input type="radio" name="learningMethod" value="weighted" checked>Weighted Random</label>
+      <label class="sidebar-radio"><input type="radio" name="learningMethod" value="srs">Spaced Repetition</label>
+    </fieldset>
+
+    <button class="sidebar-stats-btn" id="sidebarStatsBtn">📊 Statistics</button>
+    <span class="data-mgmt-link" id="openDataMgmt">💾 Data Management</span>
   </aside>
 
-  <!-- ═══════════ MAIN CONTENT ═══════════ -->
-  <main class="main-content">
+  <main class="main-content" id="mainContent">
 
-    <h1 class="app-title">Piano Key Learning</h1>
-    <p class="subtitle">Tap the correct key on the piano</p>
-
-    <!-- Score Card -->
-    <div class="top-bar">
-      <div class="score-card">
-        <div class="score-stat">
-          <div class="score-num score-color" id="scoreNum">0</div>
-          <div class="score-label">Score</div>
-        </div>
-        <div class="score-stat">
-          <div class="score-num streak-color" id="streakNum">0</div>
-          <div class="score-label">Streak</div>
-        </div>
-        <div class="score-stat" id="speedRunTimerStat" style="display:none;">
-          <div class="score-num" id="speedRunTimer" style="color: var(--red);">60</div>
-          <div class="score-label">Time</div>
-        </div>
-        <div class="medal-display">
-          <span class="medal-icon" id="medalIcon">🎹</span>
-          <span class="medal-name" id="medalName">Beginner</span>
-        </div>
+    <div class="score-card" id="scoreCard">
+      <div class="score-stat">
+        <div class="score-num score-color" id="scoreNum">0</div>
+        <div class="score-label">Score</div>
+      </div>
+      <div class="score-stat">
+        <div class="score-num streak-color" id="streakNum">0</div>
+        <div class="score-label">Streak</div>
+      </div>
+      <div class="score-stat" id="speedRunTimerStat" style="display:none">
+        <div class="score-num" id="speedRunTimer" style="color: var(--red)">60</div>
+        <div class="score-label">Time</div>
+      </div>
+      <div class="medal-display">
+        <span class="medal-icon" id="medalIcon">🎹</span>
+        <span class="medal-name" id="medalName">Beginner</span>
       </div>
     </div>
 
-    <!-- Question -->
     <div class="question-area">
       <div class="prompt" id="promptText">Tap the key …</div>
       <div class="question-note" id="questionNote">?</div>
@@ -131,7 +116,6 @@
       <div class="feedback-msg" id="feedbackMsg"></div>
     </div>
 
-    <!-- Chord Quality Buttons -->
     <div class="chord-btn-row" id="chordBtnRow" style="display:none">
       <button class="chord-btn" data-quality="major">Major</button>
       <button class="chord-btn" data-quality="minor">Minor</button>
@@ -141,26 +125,123 @@
       <button class="chord-btn" data-quality="maj7">Maj 7</button>
     </div>
 
-    <!-- Piano Keyboard -->
-    <div class="keyboard-wrap">
+    <!-- Mini keyboard map — only visible in Keyboard mode -->
+    <div class="keyboard-minimap-wrap" id="keyboardMinimapWrap" style="display:none">
+      <div class="minimap-slider" id="minimapSlider">
+        <div class="minimap-track" id="minimapTrack"></div>
+        <div class="minimap-thumb" id="minimapThumb"></div>
+      </div>
+    </div>
+
+    <div class="keyboard-viewport" id="keyboardViewport">
       <div class="keyboard" id="keyboard"></div>
     </div>
 
-    <!-- Streak Progress -->
     <div class="streak-bar">
       Next medal at <span id="nextMedalNum">10</span> streak
       <div class="streak-track" id="streakDots"></div>
     </div>
 
+    <div class="stats-dashboard hidden" id="statsDashboard">
+      <div class="stats-header">
+        <span class="stats-title">📊 Statistics</span>
+        <button class="stats-close-btn" id="statsCloseBtn" title="Close stats" aria-label="Close stats">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="stats-body" id="statsBody"></div>
+    </div>
+
+    <!-- Curriculum Progress Panel -->
+    <div class="curriculum-panel hidden" id="curriculumPanel">
+      <div class="curriculum-header">
+        <span class="curriculum-title">🎓 Lesson Progress</span>
+        <button class="curriculum-close-btn" id="curriculumCloseBtn" title="Close" aria-label="Close curriculum">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="curriculum-levels" id="curriculumLevels"></div>
+    </div>
+
   </main>
 
-  <!-- Sidebar Toggle -->
-  <button class="sidebar-toggle" id="sidebarToggle" title="Open sidebar" aria-label="Open sidebar">
-    <span class="hamburger-lines">
-      <span></span><span></span><span></span>
-    </span>
-  </button>
+</div>
 
+<div id="customSetModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title">Custom Practice Set</div>
+    <div class="control-group">
+      <label for="customSetNameInput">NAME</label>
+      <input id="customSetNameInput" type="text" placeholder="Set name">
+    </div>
+    <div class="control-group">
+      <label for="customSetModeSelect">MODE</label>
+      <select id="customSetModeSelect">
+        <option value="noteReading">Note Reading / Ear Training / Speed Run</option>
+        <option value="intervals">Intervals</option>
+        <option value="chords">Chords</option>
+      </select>
+    </div>
+    <div id="customSetItemInputs"></div>
+    <div class="modal-actions">
+      <button id="saveCustomSetBtn">save set</button>
+      <button id="cancelCustomSetBtn" class="btn-muted">cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auth Modal -->
+<div id="authModal" class="modal hidden">
+  <div class="modal-box auth-modal-box">
+    <button class="auth-close-btn" id="authCloseBtn" title="Close" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+    </button>
+    <div class="auth-modal-title" id="authModalTitle">Welcome Back</div>
+    <form id="authForm" class="auth-form">
+      <div class="control-group">
+        <label for="authEmail">EMAIL</label>
+        <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="control-group">
+        <label for="authPassword">PASSWORD</label>
+        <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="auth-submit-btn" id="authSubmitBtn">Log In</button>
+    </form>
+    <div class="auth-divider"><span>or</span></div>
+    <button class="auth-google-btn" id="authGoogleBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+    <div class="auth-toggle">
+      <a href="#" id="authToggleLink">Don't have an account? Sign up</a>
+    </div>
+  </div>
+</div>
+
+<!-- PWA Install Banner -->
+<div id="pwaBanner" class="hidden">
+  <span class="pwa-banner-text" id="pwaBannerText">Install this app for offline use</span>
+  <div class="pwa-banner-actions">
+    <button id="pwaInstallBtn">Install</button>
+    <button id="pwaDismissBtn" class="btn-muted">✕</button>
+  </div>
+</div>
+
+<!-- Export/Import Modal -->
+<div id="dataModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title">Data Management</div>
+    <p style="margin-bottom:12px;color:var(--ivory-dim);font-size:0.9rem">Backup or restore your practice progress, SRS data, and custom sets.</p>
+    <div class="modal-actions" style="flex-wrap:wrap;gap:8px">
+      <button id="exportDataBtn">📥 Export Backup</button>
+      <button id="importDataBtn" class="btn-muted">📤 Import Backup</button>
+      <input type="file" id="importFileInput" accept=".json" style="display:none">
+      <button id="resetAllDataBtn" class="btn-danger">🗑 Reset All Data</button>
+      <button id="cancelDataBtn" class="btn-muted">cancel</button>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="src/app.js"></script>

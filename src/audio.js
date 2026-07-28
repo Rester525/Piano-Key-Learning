@@ -61,6 +61,16 @@ function ensureWaveformBuffers() {
     sine:     makeBuffer((p) => Math.sin(2 * Math.PI * p)),
     triangle: makeBuffer((p) => 2 * Math.abs(2 * (p - Math.floor(p + 0.5))) - 1),
     sawtooth: makeBuffer((p) => 2 * (p - Math.floor(p + 0.5))),
+    piano:    makeBuffer((p) => {
+      // Grand piano approximated via harmonic series
+      const f = 2 * Math.PI * p;
+      return 1.00 * Math.sin(f)           // fundamental
+           + 0.60 * Math.sin(2 * f)       // octave
+           + 0.35 * Math.sin(3 * f)       // octave + fifth
+           + 0.18 * Math.sin(4 * f)       // 2nd octave
+           + 0.08 * Math.sin(5 * f)       // major third above
+           + 0.04 * Math.sin(6 * f);      // fifth above
+    }),
   };
   return waveformBuffers;
 }
@@ -102,12 +112,14 @@ function createVoice(config) {
   } = config;
 
   // Map waveform type to pre-rendered buffer
-  const bufType = (type === 'triangle' || type === 'piano')  ? 'triangle'
+  const bufType = (type === 'triangle')                ? 'triangle'
                 : (type === 'sawtooth' || type === 'guitar') ? 'sawtooth'
+                : (type === 'piano')                   ? 'piano'
                 : 'sine';
 
   const src = ctx.createBufferSource();
   src.buffer = waveformBuffers[bufType];
+  src.loop = true;
   src.playbackRate.value = freq; // pitch = frequency
 
   const gain = ctx.createGain();
@@ -147,8 +159,8 @@ function createVoice(config) {
 
 function getWaveformForInstrument() {
   switch (currentInstrument) {
-    case 'piano': return 'triangle';  // softer, more piano-like
-    case 'guitar': return 'sawtooth'; // richer harmonics
+    case 'piano': return 'piano';
+    case 'guitar': return 'sawtooth';
     case 'sine':
     default: return 'sine';
   }
@@ -184,16 +196,17 @@ export function scheduleAtAudioTime(ctx, delaySeconds, callback) {
 export function playDing(semitone, vol = 0.5) {
   const ctx = getAudioContext();
   const t = ctx.currentTime;
+  const isPiano = getWaveformForInstrument() === 'piano';
   createVoice({
     freq: semitoneToFreq(semitone),
     type: getWaveformForInstrument(),
     startTime: t,
-    duration: 1.5,
-    attack: 0.02,
-    peak: vol,
-    decay: 0.28,
-    sustain: 0.4,
-    release: 1.2,
+    duration: isPiano ? 2.5 : 1.5,
+    attack: 0.001,
+    peak: isPiano ? vol * 1.1 : vol,
+    decay: isPiano ? 0.50 : 0.28,
+    sustain: isPiano ? 0.15 : 0.4,
+    release: isPiano ? 1.9 : 1.2,
   });
 }
 

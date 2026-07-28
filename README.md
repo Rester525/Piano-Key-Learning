@@ -16,14 +16,22 @@ An interactive web app for learning piano keys, intervals, chords, and ear train
 | **Chords** | Hear a chord, select its quality (Major, Minor, Dim, Aug, Dom7, Maj7) |
 | **Speed Run** | 60-second challenge — answer as many as possible |
 
+### Platform Features
+- **Statistics Dashboard** — session history, accuracy per mode and per note, streak trends, all persisted to localStorage
+- **Custom Practice Sets** — create note/chord subsets via modal editor, filter practice pools to focus on weak areas
+- **MIDI Input** — plug in a physical MIDI keyboard and use it as answer input
+- **Keyboard Shortcuts** — Space/Enter for replay, 1–6 for chord qualities, T for theme toggle
+- **Open WebUI Design** — clean dark theme with blue accent, matching light theme, glassmorphism effects
+
 ### Core Capabilities
 - **Weighted practice algorithm** — notes you miss appear more often; mastered notes still appear at reduced frequency
+- **Spaced Repetition (SM-2)** — toggle between weighted random and SRS algorithm with ease factor, intervals, and overdue priority
 - **Shuffle-bag group rotation** — all 4 keyboard groups (CDE, FGAB, CDEFGAB, FGABCDE) appear once per cycle, no consecutive repeats
-- **FSM state machine** — explicit `IDLE` / `QUESTION_ACTIVE` / `ANSWER_PENDING` states with automatic timer cleanup (no stale callbacks)
-- **Self-cleaning Web Audio voices** — every oscillator/gain chain disconnects on `onended`; minimum 5ms attack ramps prevent clicks
-- **Multiple instrument timbres** — Sine, Piano (triangle), Guitar (sawtooth)
-- **Dark/Light theme** — persisted to `localStorage`
-- **PWA ready** — `manifest.json`, SVG icons, `apple-touch-icon`, works offline after first load
+- **FSM state machine with payloads** — explicit `IDLE` / `QUESTION_ACTIVE` / `ANSWER_PENDING` states; question data frozen in immutable payload on each transition; automatic timer cleanup
+- **Self-cleaning Web Audio voices** — pre-rendered AudioBufferSourceNode waveforms eliminate per-note OscillatorNode allocation; minimum 5ms attack ramps prevent clicks
+- **Multiple instrument timbres** — Sine, Piano (6-harmonic grand piano), Guitar (sawtooth)
+- **Dark/Light theme** — Open WebUI-inspired design system, persisted to `localStorage`
+- **PWA ready** — `manifest.json`, SVG icons, `apple-touch-icon`
 - **Mobile-first** — touch events with `preventDefault()` for iOS Safari, responsive layout, sidebar drawer on mobile
 
 ## Tech Stack
@@ -31,9 +39,10 @@ An interactive web app for learning piano keys, intervals, chords, and ear train
 | Layer | Choice |
 |-------|--------|
 | Language | Vanilla ES2022 (ES modules) |
-| Audio | Web Audio API (`AudioContext`, `OscillatorNode`, `GainNode`) |
-| Styling | CSS Custom Properties (design tokens), no build step |
-| State | Finite State Machine + weighted practice Map |
+| Audio | Web Audio API (`AudioBufferSourceNode`, `GainNode`, waveform buffers) |
+| Styling | CSS Custom Properties (Open WebUI design tokens), no build step |
+| State | Finite State Machine with frozen payloads + weighted practice Map |
+| Persistence | localStorage (stats sessions, custom sets, theme, instrument) |
 | Deploy | Vercel (static) |
 | PWA | `manifest.json`, Service Worker ready |
 
@@ -41,22 +50,25 @@ An interactive web app for learning piano keys, intervals, chords, and ear train
 
 ```
 PianoKeyLearning/
-├── index.html           # Entry point (loads src/app.js as module)
-├── style.css            # All styles (design tokens + components)
-├── manifest.json        # PWA manifest
-├── vercel.json          # Vercel config (headers, rewrites, caching)
+├── index.html              # Entry point (loads src/app.js as module)
+├── style.css               # Open WebUI design system (dark + light, ~700 lines)
+├── manifest.json           # PWA manifest
+├── vercel.json             # Vercel config (headers, rewrites, caching)
 ├── public/
 │   └── assets/img/
-│       ├── icon-192.svg # PWA icon
+│       ├── icon-192.svg    # PWA icon
 │       └── icon-512.svg
 └── src/
-    ├── app.js           # Main entry — wiring, event listeners, mode switching
-    ├── engine.js        # Constants, FSM, practice model, groups, medals, speed run timer
-    ├── audio.js         # Web Audio factory, instrument voices, playback helpers
-    ├── keyboard.js      # Keyboard DOM builder, highlight/press helpers
-    ├── ui.js            # DOM updates: score, feedback, sidebar, theme, timers
+    ├── app.js              # Main entry — wiring, event listeners, mode switching, MIDI
+    ├── engine.js           # Constants, FSM + payloads, practice model, groups, medals, speed run
+    ├── audio.js            # Pre-rendered waveform buffers, voice factory, playback helpers
+    ├── keyboard.js         # Keyboard DOM builder, highlight/press helpers
+    ├── ui.js               # DOM updates: score, feedback, sidebar, theme, stats, custom sets
+    ├── stats-engine.js     # Session recording, accuracy computation, localStorage CRUD
+    ├── stats-ui.js         # Statistics dashboard rendering (zero innerHTML, DOM-only)
+    ├── custom-sets.js      # Practice set storage, pool filtering, built-in + user sets
     └── modes/
-        └── modes.js     # All 5 mode implementations (question gen + answer handling)
+        └── modes.js        # All 5 mode implementations (question gen + answer handling)
 ```
 
 ## Local Development
@@ -90,20 +102,67 @@ The `vercel.json` config handles:
 - Long-term caching for `/assets/*` (`Cache-Control: immutable`)
 - SPA fallback rewrite (`/*` → `/index.html`)
 
+## Design System
+
+The app uses an Open WebUI-inspired design system with CSS custom properties:
+
+| Token | Dark | Light |
+|-------|------|-------|
+| Background | `#0b0f19` | `#f8fafc` |
+| Surface | `#151b28` | `#ffffff` |
+| Accent | `#4f8ef7` | `#2563eb` |
+| Text | `#e2e8f0` | `#0f172a` |
+| Border | `#1f2937` | `#e2e8f0` |
+
+Theme toggles via `data-theme` attribute on `<html>`, persisted to `localStorage`.
+
 ## Architecture Highlights
+
+### FSM with Immutable Payloads
+```js
+const State = { IDLE, QUESTION_ACTIVE, ANSWER_PENDING };
+
+function transition(newState, payload = {}) {
+  while (pendingTimers.length) clearTimeout(pendingTimers.pop());
+  fsmState = newState;
+  fsmPayload = Object.freeze({ ...payload });  // immutable
+}
+
+// Modes pass question data on transition:
+transition(State.QUESTION_ACTIVE, { semitone: 48, group, pool });
+
+// Answer handlers read from payload — no global mutation:
+const { semitone: correctAnswer } = getPayload();
+const correct = chosenSemitone === correctAnswer;
+```
+Only `transition()` may change state. Payload is frozen to prevent accidental mutation. All timers are tracked and cancelled on state change.
+
+### Statistics Engine
+```js
+// Sessions recorded per-mode, questions tracked individually
+session = startSession('noteReading');
+recordQuestion(session, { correctAnswer: '48', chosenAnswer: '48', wasCorrect: true });
+endSession(session);
+
+// Compute functions are pure — no localStorage dependency:
+getOverallAccuracy(sessions)     // → 0.85
+getAccuracyByMode(sessions)      // → { noteReading: 0.85, chords: 0.72 }
+getAccuracyByKey(sessions)       // → { '48': 1.0, 'major': 0.75 }
+getBestStreak(sessions)          // → 12
+```
+
+### Custom Practice Sets
+```js
+// Built-in sets:
+{ name: 'CDE Only', mode: 'noteReading', items: [48, 50, 52] }
+
+// User creates custom sets via modal → localStorage
+// Pool filtered before question selection:
+pool = filterPool(fullPool, activeSet);  // only items in set
+```
 
 ### Integer Semitone Model
 All internal state uses **semitone offsets from C0** (C4 = 48). Display strings are derived at the UI boundary via `semitoneToDisplay(semitone, noteType)`. Eliminates string parsing/comparison bugs.
-
-### Finite State Machine
-```js
-const State = { IDLE, QUESTION_ACTIVE, ANSWER_PENDING };
-function transition(newState) {
-  while (pendingTimers.length) clearTimeout(pendingTimers.pop());
-  fsmState = newState;
-}
-```
-Only `transition()` may change state. All timers registered via `scheduleTimer(fn, ms)` are tracked and cancelled on state change.
 
 ### Weighted Practice Selection
 ```js
@@ -119,18 +178,16 @@ pick bag[0], bag[1], bag[2], bag[3]  // each group once
 refill bag, ensure first ≠ last of previous cycle
 ```
 
-### Self-Cleaning Audio Voices
+### Pre-Rendered Audio Waveforms
 ```js
-function createVoice({freq, startTime, duration, attack, peak, ...}) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  // envelope with minimum 5ms attack
-  osc.onended = () => { gain.disconnect(); osc.disconnect(); };
-  osc.start(startTime); osc.stop(startTime + duration + 0.1);
-  return {osc, gain};
-}
+// Waveforms rendered once into AudioBuffers:
+waveformBuffers = { sine, triangle, sawtooth }
+
+// Notes use AudioBufferSourceNode with playbackRate:
+src.buffer = waveformBuffers[bufType];
+src.playbackRate.value = freq;  // frequency via rate
+// No per-note OscillatorNode allocation — lighter GC
 ```
-No manual cleanup needed — GC collects disconnected nodes.
 
 ## Keyboard Layout
 
@@ -165,6 +222,7 @@ Streak resets to 0 on any wrong answer. Score increments on correct answers only
 | ES Modules | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | CSS Custom Props | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Touch Events | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| MIDI Input | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
 | PWA Install | ✅ | ✅ | ✅* | ✅ | ✅ | ✅ |
 
 \* Safari/iOS requires user gesture before `AudioContext.resume()` — handled via one-time click/touch listener on `document`.
@@ -198,42 +256,54 @@ MIT — free to use, modify, distribute.
 
 ## Roadmap / Future Enhancements
 
-This section captures ideas discussed during development and their implementation plans.
+### ✅ Completed
 
-### 🎯 Phase 1: Core Polish (Next 1–2 weeks)
-| Idea | Description | Plan |
-|------|-------------|------|
-| **MIDI Input Support** | Connect physical MIDI keyboard for answer input | Add `navigator.requestMIDIAccess()` handler in `app.js`; map MIDI note numbers to semitone values; fallback gracefully when unavailable (Safari, mobile). |
-| **Service Worker / Offline** | Full offline support after first visit | Generate `sw.js` with Workbox or manual Cache API; precache `index.html`, `style.css`, `src/**`, `manifest.json`, icons. Register in `app.js` after load. |
-| **Statistics Dashboard** | Session history, accuracy per note, streak trends | Add `stats.js` module; store sessions in `localStorage` (or IndexedDB for larger data); render charts with simple Canvas or import Chart.js via CDN. |
-| **Custom Practice Sets** | User-defined note/interval/chord subsets | New sidebar section "Custom Set" with multi-select; persist to `localStorage`; filter `getPlayableSemis()` and chord/interval pools. |
+| Feature | Status |
+|---------|--------|
+| MIDI Input Support | ✅ Done |
+| Statistics Dashboard | ✅ Done — localStorage sessions, accuracy by mode/note, streak trends |
+| Custom Practice Sets | ✅ Done — modal editor, pool filtering, built-in + user sets |
+| FSM Payload Transitions | ✅ Done — immutable payloads on state change |
+| Pre-rendered Audio Waveforms | ✅ Done — AudioBufferSourceNode pool |
+| Open WebUI Design System | ✅ Done — dark + light theme with blue accent |
+| **Piano Waveform (6 harmonics)** | ✅ Done — hammer-strike timbre with natural decay |
+| **88-Key Free Play Keyboard** | ✅ Done — full A0–C8 range with minimap slider |
+| **Service Worker / Offline** | ✅ Done — cache-first strategy, all static assets precached |
+| **Spaced Repetition (SM-2)** | ✅ Done — SRS algorithm with ease factor, intervals, overdue priority |
+| Keyboard Shortcuts | ✅ Done — Space/Enter replay, 1–6 chords, T theme, Esc sidebar |
+| **iOS PWA Install Prompt** | ✅ Done — custom banner with localStorage dismissal, iOS Safari instructions |
+| **Export / Import Progress** | ✅ Done — JSON backup/restore for stats, SRS, custom sets |
+| **Lesson / Curriculum Mode** | ✅ Done — 6-level guided progression, auto-unlock, progress panel |
 
-### 🎯 Phase 2: Learning Features (1–2 months)
-| Idea | Description | Plan |
-|------|-------------|------|
-| **Spaced Repetition (SM-2)** | Replace weighted random with proper SRS algorithm | Implement SM-2 in `engine.js` — track `easeFactor`, `interval`, `repetitions` per item; schedule reviews; show "due" count in UI. |
-| **Lesson / Curriculum Mode** | Guided progression: CDE → FGAB → CDEFGAB → accidentals → intervals → chords | Add `curriculum.js` with ordered lessons; each lesson unlocks next; store progress in `localStorage`; show lesson map UI. |
-| **Sheet Music Display** | Show staff notation for current question | Integrate VexFlow (ESM from CDN) to render a measure with the target note/chord; toggle with "Show Notation" checkbox. |
-| **Microphone Pitch Detection** | Sing/play a note, app detects pitch for ear training | Use Web Audio `AnalyserNode` + autocorrelation or `aubio.wasm`; map detected frequency to nearest semitone; use as answer input. |
-| **Multiplayer / Challenge Links** | Share a seeded session URL for competitive practice | Add `?seed=X&mode=Y` URL params; deterministic RNG via `seedrandom`; show leaderboard for that seed. |
+### 🎯 Phase 1: Core Polish
 
-### 🎯 Phase 3: Platform & Polish (Ongoing)
-| Idea | Description | Plan |
-|------|-------------|------|
-| **Native Audio Samples** | Replace synthesized tones with real piano/guitar samples | Add `public/assets/audio/` with `.ogg`/`.mp3` per note (or use Web Audio `AudioBufferSourceNode` with decoded samples); toggle in settings. |
-| **iOS PWA Install Prompt** | Custom "Add to Home Screen" banner | Listen for `beforeinstallprompt`; show custom banner after 2nd visit; track dismissals. |
-| **Accessibility Audit** | Full WCAG 2.1 AA compliance | Semantic HTML review; ARIA labels for keyboard; color contrast check; keyboard-only navigation; screen reader testing. |
-| **Internationalization (i18n)** | Multiple languages for UI text | Extract all strings to `locales/en.json`; add language selector in sidebar; dynamic import locale files. |
-| **Chromatic Tuner Mode** | Real-time pitch meter for tuning instrument | New mode: listen via microphone, show cents deviation from target note; visual needle + text. |
+*(All Phase 1 items complete ✅)*
+
+### 🎯 Phase 2: Learning Features
+
+| Idea | Description |
+|------|-------------|
+| **Sheet Music Display** | Show staff notation via VexFlow (lazy-loaded ESM from CDN) |
+| **Microphone Pitch Detection** | Sing/play a note, app detects pitch via Web Audio AnalyserNode + autocorrelation |
+| **Multiplayer / Challenge Links** | Share a seeded session URL for competitive practice |
+
+### 🎯 Phase 3: Platform & Polish
+
+| Idea | Description |
+|------|-------------|
+| **Native Audio Samples** | Replace synthesized tones with real piano/guitar samples via AudioBufferSourceNode |
+| **Accessibility Audit** | Full WCAG 2.1 AA — semantic HTML, ARIA labels, keyboard-only navigation |
+| **Internationalization (i18n)** | Multiple languages, locale files, dynamic import |
+| **Chromatic Tuner Mode** | Real-time pitch meter via microphone |
 
 ### 🎯 Phase 4: Advanced / Experimental
-| Idea | Description | Plan |
-|------|-------------|------|
-| **Hand Position / Fingering Hints** | Show suggested finger numbers on keys | Add fingering data to `GROUPS`; render small numbers on key corners; highlight suggested finger for current question. |
-| **Chord Progression Practice** | Play common progressions (ii-V-I, I-vi-IV-V, etc.) | Extend `CHORD_QUALITIES` with progression definitions; new mode plays progression, user identifies each chord or plays along. |
-| **Harmonic Analysis** | Identify chord function in key (I, IV, V, etc.) | Add key context to chord mode; ask "What is the function of this chord in C major?" |
-| **Export / Sync Progress** | Backup/restore practice data to JSON or cloud | Add "Export Data" / "Import Data" buttons; optionally sync to Firebase/GitHub Gist via PAT. |
-| **Teacher Dashboard** | Instructor view of student progress | Separate admin mode; read-only view of shared practice data via invite links; requires backend or shared storage. |
+
+| Idea | Description |
+|------|-------------|
+| **Fingering Hints** | Suggested finger numbers on keys |
+| **Chord Progression Practice** | Play common progressions (ii-V-I, I-vi-IV-V) |
+| **Harmonic Analysis** | Identify chord function in key (I, IV, V, etc.) |
+| **Teacher Dashboard** | Instructor view of student progress |
 
 ### 📋 Implementation Notes
 - **No build step** — all additions must work as static ES modules on Vercel
@@ -242,8 +312,6 @@ This section captures ideas discussed during development and their implementatio
 - **Mobile parity** — every desktop feature must work on iOS Safari / Chrome Android
 
 ---
-
-Built with ☕ and 🎹 for piano learners everywhere.
 
 ## Usage Guide
 
@@ -263,12 +331,12 @@ Built with ☕ and 🎹 for piano learners everywhere.
 2. Tap the matching key on the on-screen piano
 3. Correct → green highlight + pleasant cadence; Wrong → red highlight + diminished resolution
 4. Next question auto-advances after ~1.5s
+5. **Practice Set** filter in sidebar to focus on specific notes
 
 #### Ear Training
 1. Press **Play Again** (🔊) to hear the target note
 2. Tap the key you think you heard
 3. Same feedback as Note Reading
-4. Use **Play Again** as many times as needed
 
 #### Intervals
 1. Hear two notes: root + interval (700ms gap)
@@ -279,19 +347,38 @@ Built with ☕ and 🎹 for piano learners everywhere.
 #### Chords
 1. Hear a full chord (all tones played with 20ms stagger)
 2. Six quality buttons appear: Major, Minor, Dim, Aug, Dom7, Maj7
-3. Tap the quality you heard
+3. Tap the quality you heard (or press 1–6)
 4. Wrong answer reveals correct button in green
 
 #### Speed Run
 1. 60-second countdown starts immediately
 2. Same as Note Reading but faster pace (800ms between questions)
 3. Timer shows in score card (red when <10s)
-4. Final screen shows score + streak; tap any mode to restart
+4. Final screen shows score + streak
+
+### Statistics Dashboard
+Click **📊 Statistics** in the sidebar to view:
+- Session count, total questions, overall accuracy, best streak
+- Accuracy breakdown by mode (horizontal bars)
+- Recent sessions with score, accuracy, and streak per session
+- **Clear all data** button to reset
+
+### Custom Practice Sets
+- Select a set from the **Practice Set** dropdown to filter questions
+- Built-in sets: CDE Only, FGAB Only, All Notes, All Qualities
+- Click **+ add custom set** to create your own — choose mode and name
+- Custom sets are saved to localStorage
 
 ### Touch / Mobile
 - Tap keys normally — `touchstart` with `preventDefault()` prevents scroll/zoom
 - Sidebar opens via ☰ button (top-left); closes on outside tap
 - Piano horizontally scrolls on narrow screens
+
+### MIDI Keyboard
+- Plug in a USB MIDI keyboard — recognized automatically
+- MIDI note-on messages map to piano keys
+- Works in Note Reading, Ear Training, Intervals, and Speed Run modes
+- Not supported in Safari or iOS
 
 ---
 
@@ -301,10 +388,13 @@ Built with ☕ and 🎹 for piano learners everywhere.
 ```
 index.html
   └── src/app.js (entry)
-       ├── src/engine.js (constants, FSM, practice model, groups, medals, speed run)
-       ├── src/audio.js (AudioContext, voices, playback helpers)
+       ├── src/engine.js (constants, FSM + payloads, practice model, groups, medals, speed run)
+       ├── src/audio.js (pre-rendered waveform buffers, voice factory, playback helpers)
        ├── src/keyboard.js (DOM builder, highlight/press)
-       ├── src/ui.js (DOM updates, sidebar, theme, timers)
+       ├── src/ui.js (DOM updates, sidebar, theme, stats, custom sets)
+       ├── src/stats-engine.js (session CRUD, accuracy computation)
+       ├── src/stats-ui.js (stats dashboard rendering)
+       ├── src/custom-sets.js (practice set storage + filtering)
        └── src/modes/modes.js (5 mode implementations)
 ```
 
@@ -318,6 +408,7 @@ handleKeyAnswer() / handleChordAnswer()
       ├──▶ Audio Feedback (playDing, cadences)
       ├──▶ Visual Feedback (highlightAnswer, setQuestionNote)
       ├──▶ Practice Model Update (recordAttempt)
+      ├──▶ Stats Recording (recordQuestion → statsSession)
       ├──▶ Score Update (updateScore)
       └──▶ Schedule Next Question (scheduleTimer → mode.startXxxMode)
 ```
@@ -329,7 +420,7 @@ handleKeyAnswer() / handleChordAnswer()
                     │ (mode switch,   │
                     │  noteType change)│
                     └────────┬────────┘
-                             │ transition(QUESTION_ACTIVE)
+                             │ transition(QUESTION_ACTIVE, {semitone, group, pool})
                              ▼
                     ┌─────────────────┐
          ┌──────────│ QUESTION_ACTIVE │──────────┐
@@ -350,81 +441,31 @@ handleKeyAnswer() / handleChordAnswer()
                     └─────────────────┘
 
 All states: transition() clears ALL pendingTimers atomically
+Payload: Object.freeze() on each transition — answer handlers read from getPayload()
 ```
-
-### Practice Model (Weighted Selection)
-```
-practiceModel = Map<key, {attempts, correct, lastSeen}>
-
-key = semitone (notes/intervals) OR qualityKey (chords)
-
-weight(key) = 1 / (1 + successRate * 4)
-  successRate = correct / attempts
-  never-seen → 1.0
-  50% → 0.33
-  100% → 0.2
-
-weightedPick(keys, avoidKey):
-  weights = keys.map(weight)
-  if key === avoidKey → weight = 0
-  random weighted selection
-```
-
-### Shuffle-Bag Group Rotation
-```
-GROUPS = [cde, fgab, cdefgab, fgabcde]  // indices 0,1,2,3
-
-pickNextGroup():
-  if bag empty or exhausted:
-    bag = fisherYatesShuffle([0,1,2,3])
-    if bag[0] === lastPicked: swap with random other
-    index = 0
-  return GROUPS[bag[index++]]
-```
-
-### Audio Voice Lifecycle
-```
-createVoice(config)
-  │
-  ├─▶ OscillatorNode + GainNode
-  ├─▶ Envelope: attack(≥5ms) → decay → sustain → release
-  ├─▶ osc.onended = () => { gain.disconnect(); osc.disconnect(); }
-  ├─▶ osc.start(t); osc.stop(t + duration + 0.1)
-  └─▶ returns {osc, gain} (discardable)
-```
-
----
-
-## Contributing Guide
-
-### Code Style
-- **ES2022 modules** — `import`/`export`, no bundler
-- **2-space indent**, semicolons, single quotes
-- **CSS**: BEM-ish classes (`.keyboard-wrap`, `.white-key`, `.chord-btn`), custom properties for all colors/spacing
-- **No external deps** — vanilla JS + Web Audio only (heavy libs lazy-loaded only when needed)
-
-### Adding a Feature
-1. Create branch: `git checkout -b feat/your-feature`
-2. Implement in appropriate module(s)
-3. Test locally: `python3 -m http.server 8000`
-4. Verify no console errors in Chrome, Firefox, Safari
-5. Ensure mobile works (touch, sidebar, scroll)
-6. PR with description of changes + screenshots if UI
-
-### PR Process
-1. Push branch, open PR against `main`
-2. CI: Vercel preview deploy auto-runs
-3. Review: at least one approval
-4. Squash merge to `main` (auto-deploys to production)
-
-### Issue Templates
-- **Bug Report** — steps to reproduce, browser/OS, console errors
-- **Feature Request** — use case, proposed API/UI, phase (1–4)
-- **Accessibility** — WCAG criterion, screen reader behavior
 
 ---
 
 ## Changelog
+
+### v1.2.0 (2026-07-27)
+- **Spaced Repetition (SM-2)** — toggle between weighted random and SRS in sidebar; SM-2 algorithm with ease factor, intervals, overdue priority; `srs-engine.js` pure compute module
+- **88-Key Free Play Keyboard** — full A0–C8 piano with minimap slider navigation; free-play mode with no scoring
+- **Piano waveform upgrade** — 6-harmonic grand piano timbre with hammer-strike attack and natural decay envelope
+- **Service Worker offline support** — cache-first strategy, all static assets precached (`sw.js`)
+- **iOS PWA Install Prompt** — custom banner with `beforeinstallprompt` (Chrome) and Safari manual instructions; 7-day dismissal
+- **Export / Import Progress** — JSON backup/restore for stats, SRS data, custom sets; reset all data option
+- **Lesson Curriculum Mode** — 6-level guided progression (CDE → FGAB → Full Octave → Sharps/Flats → Intervals → Chords); auto-unlock with accuracy gates; live progress panel
+- **Shortcuts** — Space/Enter replay, 1–6 chords, T theme toggle, Esc close sidebar
+
+### v1.1.0 (2026-07-27)
+- **FSM payload transitions** — immutable question data on state change, answer handlers read from `getPayload()`
+- **Statistics Dashboard** — session recording, accuracy by mode/note, recent sessions, localStorage persistence
+- **Custom Practice Sets** — modal editor, built-in + user sets, pool filtering across all modes
+- **MIDI input** — `navigator.requestMIDIAccess()` with semitone mapping
+- **Pre-rendered audio** — AudioBufferSourceNode waveform pool replacing OscillatorNode allocation
+- **Open WebUI theme** — new design system with blue accent, glassmorphism, refined dark + light palettes
+- **Keyboard shortcuts** — Space/Enter for replay, 1–6 for chords, T for theme, Esc for sidebar
 
 ### v1.0.0 (2026-07-22)
 - Initial release
@@ -449,9 +490,9 @@ createVoice(config)
 - **Note Type = "Whole"** — black keys hidden; switch to "Sharps", "Flats", or "All"
 
 ### Score/Streak not saving
-- Data is **in-memory only** per session
-- Refresh resets everything (by design for v1)
-- Phase 1 roadmap: Statistics Dashboard with `localStorage` persistence
+- **Session data now persists** via Statistics Dashboard (localStorage)
+- Refresh still resets current session score but history is saved
+- Click "📊 Statistics" to view past performance
 
 ### PWA not installing
 - **HTTPS required** — Vercel provides this
@@ -459,14 +500,15 @@ createVoice(config)
 - **iOS** — use Share → Add to Home Screen (no auto-prompt)
 
 ### MIDI not working
-- **Not implemented yet** — Phase 1 roadmap
-- **Safari** — no `navigator.requestMIDIAccess` support
-- **Workaround** — use computer keyboard mapping (planned) or on-screen piano
+- **Chrome/Edge/Firefox** — supported; plug in keyboard and play
+- **Safari/iOS** — no `navigator.requestMIDIAccess` support
+- **Fallback** — on-screen piano and keyboard shortcuts always work
 
 ### Performance issues
 - **Heavy libs lazy-load** — VexFlow, Chart.js, aubio only load when mode activated
-- **Voice cleanup** — every oscillator disconnects on `onended`
+- **Voice cleanup** — every AudioBufferSourceNode disconnects on `onended`
 - **No memory leaks** — FSM cancels all timers on state change
+- **Waveform buffers** — pre-rendered once, reused for all notes via `playbackRate`
 
 ### Development server CORS errors
 - Use `npx vercel dev` instead of `python -m http.server` for ES module imports

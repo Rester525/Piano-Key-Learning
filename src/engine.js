@@ -70,15 +70,18 @@ export const State = Object.freeze({
 });
 
 let fsmState = State.IDLE;
+let fsmPayload = {};
 const pendingTimers = [];
 
-/** Atomically change FSM state, killing all dangling timers. */
-export function transition(newState) {
+/** Atomically change FSM state with optional payload, killing all dangling timers. */
+export function transition(newState, payload = {}) {
   while (pendingTimers.length) clearTimeout(pendingTimers.pop());
   fsmState = newState;
+  fsmPayload = Object.freeze({ ...payload });
 }
 
 export function getState() { return fsmState; }
+export function getPayload() { return fsmPayload; }
 
 /** Schedule a timeout that transition() will clean up on state change. */
 export function scheduleTimer(fn, ms) {

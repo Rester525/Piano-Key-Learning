@@ -274,6 +274,7 @@ MIT — free to use, modify, distribute.
 | **iOS PWA Install Prompt** | ✅ Done — custom banner with localStorage dismissal, iOS Safari instructions |
 | **Export / Import Progress** | ✅ Done — JSON backup/restore for stats, SRS, custom sets |
 | **Lesson / Curriculum Mode** | ✅ Done — 6-level guided progression, auto-unlock, progress panel |
+| **Sheet Music Display** | ✅ Done — VexFlow 5.x staff notation, per-mode rendering, sidebar toggle |
 
 ### 🎯 Phase 1: Core Polish
 
@@ -283,7 +284,6 @@ MIT — free to use, modify, distribute.
 
 | Idea | Description |
 |------|-------------|
-| **Sheet Music Display** | Show staff notation via VexFlow (lazy-loaded ESM from CDN) |
 | **Microphone Pitch Detection** | Sing/play a note, app detects pitch via Web Audio AnalyserNode + autocorrelation |
 | **Multiplayer / Challenge Links** | Share a seeded session URL for competitive practice |
 

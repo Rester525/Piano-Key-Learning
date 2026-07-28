@@ -20,7 +20,7 @@ import { buildKeyboard, clearHighlights, setKeyboardLocked,
 import { updateScore, setQuestionNote, setPrompt, setFeedback, clearFeedback,
          showPlayAgain, showChordButtons, clearChordButtons, setChordButtonState,
          showSpeedRunTimer, updateSpeedRunTimer, setKeyboardLocked as uiSetKeyboardLocked,
-         setupModeRadios, setupNoteTypeRadios, setupInstrumentRadios,
+         setupModeRadios, setupNoteTypeRadios, setupInstrumentRadios, setupInstrumentSelect,
          setupLearningMethodRadios,
          setupSidebar, setupThemeToggle, initUI, setupCurriculumPanel } from './ui.js';
 
@@ -451,8 +451,8 @@ function setupEventListeners() {
   // Note type radios
   setupNoteTypeRadios(handleNoteTypeChange);
 
-  // Instrument radios
-  setupInstrumentRadios(handleInstrumentChange);
+  // Instrument select (dropdown)
+  setupInstrumentSelect(handleInstrumentChange);
 
   // Learning method radios
   setupLearningMethodRadios((method) => {

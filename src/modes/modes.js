@@ -95,7 +95,10 @@ export async function handleNoteReadingAnswer(context, chosenSemitone, keyEl) {
 
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
-    if (modeSnapshot === 'noteReading') startNoteReadingMode(context);
+    if (modeSnapshot === 'noteReading') {
+      startNoteReadingMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 1500);
 }
 
@@ -167,7 +170,10 @@ export async function handleEarTrainingAnswer(context, chosenSemitone, keyEl) {
 
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
-    if (modeSnapshot === 'earTraining') startEarTrainingMode(context);
+    if (modeSnapshot === 'earTraining') {
+      startEarTrainingMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 1500);
 }
 
@@ -267,7 +273,10 @@ export async function handleIntervalsAnswer(context, chosenSemitone, keyEl) {
 
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
-    if (modeSnapshot === 'intervals') startIntervalsMode(context);
+    if (modeSnapshot === 'intervals') {
+      startIntervalsMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 1500);
 }
 
@@ -366,6 +375,7 @@ export async function handleChordsAnswer(context, qualityKey, btnEl) {
   scheduleTimer(() => {
     showChordButtons(false);
     startChordsMode(context);
+    context.renderSheetMusic?.();
   }, 2000);
 }
 
@@ -468,7 +478,10 @@ export async function handleSpeedRunAnswer(context, chosenSemitone, keyEl) {
 
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
-    if (modeSnapshot === 'speedRun' && getSpeedRunTimeLeft() > 0) startSpeedRunMode(context);
+    if (modeSnapshot === 'speedRun' && getSpeedRunTimeLeft() > 0) {
+      startSpeedRunMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 800); // Faster pace for speed run
 }
 
@@ -763,7 +776,10 @@ export async function handleCurriculumAnswer(context, chosenSemitone, keyEl) {
 
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
-    if (modeSnapshot === 'curriculum') startCurriculumMode(context);
+    if (modeSnapshot === 'curriculum') {
+      startCurriculumMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 1500);
 }
 
@@ -809,6 +825,9 @@ export async function handleCurriculumChordsAnswer(context, qualityKey, btnEl) {
   const modeSnapshot = activeMode;
   scheduleTimer(() => {
     showChordButtons(false);
-    if (modeSnapshot === 'curriculum') startCurriculumMode(context);
+    if (modeSnapshot === 'curriculum') {
+      startCurriculumMode(context);
+      context.renderSheetMusic?.();
+    }
   }, 2000);
 }

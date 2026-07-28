@@ -670,6 +670,39 @@ body {
   white-space: nowrap;
 }
 .top-bar-logout-btn:hover { color: var(--red); border-color: var(--red); }
+
+/* ─── SHEET MUSIC ──────────────────────────────────────────────── */
+
+.staff-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.staff-wrap canvas {
+  max-width: 100%;
+  height: auto;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.staff-wrap.hidden { display: none; }
+
+/* ─── SIDEBAR CHECKBOX ─────────────────────────────────────────── */
+
+.sidebar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--ivory-dim);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.sidebar-checkbox input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
 .keyboard-viewport::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 .keyboard-viewport::-webkit-scrollbar-thumb:hover { background: var(--muted-dim); }
 

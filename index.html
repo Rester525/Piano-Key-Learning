@@ -81,6 +81,11 @@
       <label class="sidebar-radio"><input type="radio" name="learningMethod" value="srs">Spaced Repetition</label>
     </fieldset>
 
+    <fieldset class="sidebar-section">
+      <legend>Display</legend>
+      <label class="sidebar-checkbox"><input type="checkbox" id="showSheetMusic" checked>🎼 Show Sheet Music</label>
+    </fieldset>
+
     <button class="sidebar-stats-btn" id="sidebarStatsBtn">📊 Statistics</button>
     <span class="data-mgmt-link" id="openDataMgmt">💾 Data Management</span>
   </aside>
@@ -114,6 +119,10 @@
         Play Again
       </button>
       <div class="feedback-msg" id="feedbackMsg"></div>
+    </div>
+
+    <div class="staff-wrap" id="staffWrap">
+      <canvas id="staffCanvas" width="400" height="140"></canvas>
     </div>
 
     <div class="chord-btn-row" id="chordBtnRow" style="display:none">

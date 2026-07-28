@@ -25,6 +25,7 @@ const PRECACHE_URLS = [
   '/src/auth-ui.js',
   '/src/sync.js',
   '/src/supabase.js',
+  '/src/sheet-music.js',
   '/public/assets/img/icon-192.svg',
   '/public/assets/img/icon-512.svg',
 ];

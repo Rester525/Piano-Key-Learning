@@ -38,6 +38,7 @@ import { getCurrentLevel } from './curriculum.js';
 import { initAuthUI, updateUserUI } from './auth-ui.js';
 import { getSession } from './auth.js';
 import { scheduleCloudSync } from './sync.js';
+import { renderNote, renderInterval, renderChord, clearStaff } from './sheet-music.js';
 
 // ─── GLOBAL STATE ──────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ let currentInterval = null;
 let score = 0;
 let streak = 0;
 let learningMethod = 'weighted';
+let showSheetMusic = localStorage.getItem('pkl_show_sheet') !== 'false'; // default on
 
 // ─── CONTEXT OBJECT FOR MODES ──────────────────────────────────────
 
@@ -146,6 +148,9 @@ const context = {
 
   // Cloud sync
   scheduleSync: scheduleCloudSync,
+
+  // Sheet music
+  renderSheetMusic: renderCurrentSheetMusic,
 };
 
 // ─── MODE SWITCHING ────────────────────────────────────────────────
@@ -182,6 +187,7 @@ async function switchMode(newMode) {
       setPrompt('Tap the key …');
       showPlayAgain(false);
       await startNoteReadingMode(context);
+      renderCurrentSheetMusic();
       break;
     case 'earTraining':
       setPrompt('Listen, then tap the key …');
@@ -189,28 +195,35 @@ async function switchMode(newMode) {
       setQuestionNote('🔊');
       currentGroup = GROUPS[2];
       buildKeyboard(currentGroup, noteType);
-      scheduleTimer(() => startEarTrainingMode(context), 400);
+      scheduleTimer(() => {
+        startEarTrainingMode(context);
+        renderCurrentSheetMusic();
+      }, 400);
       break;
     case 'intervals':
       setPrompt('From … tap the note you hear');
       showPlayAgain(true);
       setQuestionNote('?');
       await startIntervalsMode(context);
+      renderCurrentSheetMusic();
       break;
     case 'chords':
       setPrompt('What chord quality?');
       showPlayAgain(true);
       setQuestionNote('?');
       await startChordsMode(context);
+      renderCurrentSheetMusic();
       break;
     case 'speedRun':
       setPrompt('Speed Run — 60 seconds!');
       showPlayAgain(false);
       setQuestionNote('?');
       await startSpeedRunMode(context);
+      renderCurrentSheetMusic();
       break;
     case 'keyboard':
       await startKeyboardMode(context);
+      renderCurrentSheetMusic();
       break;
     case 'curriculum':
       setPrompt('🎓 Curriculum Mode');
@@ -218,6 +231,7 @@ async function switchMode(newMode) {
       setQuestionNote('?');
       clearCurriculumCompletion();
       await startCurriculumMode(context);
+      renderCurrentSheetMusic();
       break;
     default:
       setPrompt('Coming soon …');
@@ -370,6 +384,35 @@ function handlePlayAgain() {
   });
 }
 
+// ─── SHEET MUSIC RENDER ─────────────────────────────────────────────
+
+function renderCurrentSheetMusic() {
+  const wrap = document.getElementById('staffWrap');
+  if (!wrap) return;
+  if (!showSheetMusic) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+
+  clearStaff('staffCanvas');
+
+  if (activeMode === 'keyboard') return; // no sheet music in free play
+
+  const semitone = currentSemitone;
+  if (semitone === null) return;
+
+  if (activeMode === 'chords') {
+    if (currentChordSemis && currentChordSemis.length > 0) {
+      renderChord('staffCanvas', currentChordSemis, noteType);
+    }
+  } else if (activeMode === 'intervals') {
+    if (currentRootSemitone !== null && currentSemitone !== null) {
+      renderInterval('staffCanvas', currentRootSemitone, currentSemitone, noteType);
+    }
+  } else {
+    // noteReading, earTraining, speedRun, curriculum
+    renderNote('staffCanvas', semitone, noteType);
+  }
+}
+
 // ─── EVENT LISTENERS ───────────────────────────────────────────────
 
 function setupEventListeners() {
@@ -418,6 +461,17 @@ function setupEventListeners() {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardShortcut);
+
+  // Sheet music toggle
+  const sheetCheckbox = document.getElementById('showSheetMusic');
+  if (sheetCheckbox) {
+    sheetCheckbox.checked = showSheetMusic;
+    sheetCheckbox.addEventListener('change', () => {
+      showSheetMusic = sheetCheckbox.checked;
+      localStorage.setItem('pkl_show_sheet', showSheetMusic);
+      renderCurrentSheetMusic();
+    });
+  }
 }
 
 function handleKeyboardShortcut(e) {

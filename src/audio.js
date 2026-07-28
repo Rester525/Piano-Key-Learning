@@ -62,14 +62,16 @@ function ensureWaveformBuffers() {
     triangle: makeBuffer((p) => 2 * Math.abs(2 * (p - Math.floor(p + 0.5))) - 1),
     sawtooth: makeBuffer((p) => 2 * (p - Math.floor(p + 0.5))),
     piano:    makeBuffer((p) => {
-      // Grand piano approximated via harmonic series
+      // Grand piano approximated via harmonic series — normalized to prevent clipping
       const f = 2 * Math.PI * p;
-      return 1.00 * Math.sin(f)           // fundamental
+      const total = 1.00 + 0.60 + 0.35 + 0.18 + 0.08 + 0.04;
+      return (1.00 * Math.sin(f)           // fundamental
            + 0.60 * Math.sin(2 * f)       // octave
            + 0.35 * Math.sin(3 * f)       // octave + fifth
            + 0.18 * Math.sin(4 * f)       // 2nd octave
            + 0.08 * Math.sin(5 * f)       // major third above
-           + 0.04 * Math.sin(6 * f);      // fifth above
+           + 0.04 * Math.sin(6 * f))      // fifth above
+           / total;
     }),
   };
   return waveformBuffers;

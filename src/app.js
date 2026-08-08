@@ -22,7 +22,8 @@ import { updateScore, setQuestionNote, setPrompt, setFeedback, clearFeedback,
          showSpeedRunTimer, updateSpeedRunTimer, setKeyboardLocked as uiSetKeyboardLocked,
          setupModeRadios, setupNoteTypeRadios, setupInstrumentRadios, setupInstrumentSelect,
          setupLearningMethodRadios,
-         setupSidebar, setupThemeToggle, initUI, setupCurriculumPanel } from './ui.js';
+         setupSidebar, setupThemeToggle, initUI, setupCurriculumPanel,
+         setMIDIStatus } from './ui.js';
 
 import { startNoteReadingMode, handleNoteReadingAnswer } from './modes/modes.js';
 import { startEarTrainingMode, handleEarTrainingAnswer, replayEarTraining } from './modes/modes.js';
@@ -151,6 +152,9 @@ const context = {
 
   // Sheet music
   renderSheetMusic: renderCurrentSheetMusic,
+
+  // MIDI
+  setMIDIStatus,
 };
 
 // ─── MODE SWITCHING ────────────────────────────────────────────────
@@ -536,23 +540,73 @@ function handleKeyboardShortcut(e) {
 
 // ─── MIDI INPUT ─────────────────────────────────────────────────────
 
+let _midiAccess = null;
+let _midiDisconnectHandler = null;
+
+function connectMIDI(midiAccess) {
+  _midiAccess = midiAccess;
+  const inputs = Array.from(midiAccess.inputs.values());
+  if (inputs.length > 0) {
+    setMIDIStatus('connected');
+  } else {
+    setMIDIStatus('disconnected');
+  }
+
+  // Listen for devices being plugged/unplugged
+  _midiDisconnectHandler = (e) => {
+    if (e.port.type === 'input') {
+      const count = Array.from(midiAccess.inputs.values()).length;
+      setMIDIStatus(count > 0 ? 'connected' : 'disconnected');
+    }
+  };
+  midiAccess.onstatechange = _midiDisconnectHandler;
+
+  // Wire note messages from all current + future inputs
+  const wireInput = (input) => {
+    input.onmidimessage = (msg) => {
+      const [status, note, velocity] = msg.data;
+      // Note On (0x90 + channel 0-15, velocity > 0)
+      if (status >= 0x90 && status <= 0x9F && velocity > 0) {
+        const appSemi = note - 12; // MIDI middle C=60 → app C4=48
+        const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
+        handleKeyAnswer(appSemi, keyEl);
+      }
+    };
+  };
+
+  midiAccess.inputs.forEach(wireInput);
+  midiAccess.onstatechange = (e) => {
+    if (_midiDisconnectHandler) _midiDisconnectHandler(e);
+    // Wire newly connected input
+    if (e.port.type === 'input' && e.port.connection === 'open') {
+      wireInput(e.port);
+    }
+  };
+}
+
 function setupMIDI() {
-  if (!navigator.requestMIDIAccess) return;
-  navigator.requestMIDIAccess().then(midi => {
-    midi.inputs.forEach(input => {
-      input.onmidimessage = (msg) => {
-        const [status, note, velocity] = msg.data;
-        // Note On (0x90 + channel 0-15, velocity > 0)
-        if (status >= 0x90 && status <= 0x9F && velocity > 0) {
-          const appSemi = note - 12; // MIDI middle C=60 → app C4=48
-          const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
-          handleKeyAnswer(appSemi, keyEl);
-        }
-      };
+  if (!navigator.requestMIDIAccess) {
+    setMIDIStatus('unsupported');
+    return;
+  }
+
+  // Chrome requires a user gesture for requestMIDIAccess().
+  // Defer to the first click anywhere on the page.
+  const tryConnect = () => {
+    navigator.requestMIDIAccess()
+      .then(connectMIDI)
+      .catch(() => setMIDIStatus('disconnected'));
+  };
+
+  // Try immediately in case the page was loaded from a user gesture
+  // (e.g. click on a bookmark). If it fails due to NotAllowedError,
+  // we retry on the next user gesture.
+  navigator.requestMIDIAccess()
+    .then(connectMIDI)
+    .catch(() => {
+      // Silenced — will retry on first click
+      document.addEventListener('click', tryConnect, { once: true });
     });
-  }).catch(() => {
-    // Safari, mobile, or permission denied — silent fail
-  });
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────

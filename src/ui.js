@@ -27,6 +27,7 @@ const elements = {
   sidebarClose: $('sidebarClose'),
   topBarThemeToggle: $('topBarThemeToggle'),
   topBarInstrument: $('topBarInstrument'),
+  midiDot: $('midiDot'),
 };
 
 // ─── SCORE & MEDAL DISPLAY ────────────────────────────────────────
@@ -126,6 +127,26 @@ export function setKeyboardLocked(locked) {
   if (!viewport) return;
   if (locked) viewport.classList.add('locked-ui');
   else viewport.classList.remove('locked-ui');
+}
+
+// ─── MIDI STATUS INDICATOR ────────────────────────────────────────
+
+/**
+ * Update the top-bar MIDI indicator dot.
+ * @param {'unsupported'|'disconnected'|'connected'} status
+ */
+export function setMIDIStatus(status) {
+  const dot = elements.midiDot;
+  dot.classList.remove('connected', 'unsupported');
+  if (status === 'connected') {
+    dot.classList.add('connected');
+    dot.title = 'MIDI keyboard connected';
+  } else if (status === 'unsupported') {
+    dot.classList.add('unsupported');
+    dot.title = 'MIDI requires Chrome/Edge — not supported in Safari';
+  } else {
+    dot.title = 'MIDI keyboard not detected';
+  }
 }
 
 // ─── MODE SWITCHING ────────────────────────────────────────────────

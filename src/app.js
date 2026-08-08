@@ -540,26 +540,13 @@ function handleKeyboardShortcut(e) {
 
 // ─── MIDI INPUT ─────────────────────────────────────────────────────
 
-let _midiAccess = null;
-let _midiDisconnectHandler = null;
-
 function connectMIDI(midiAccess) {
-  _midiAccess = midiAccess;
   const inputs = Array.from(midiAccess.inputs.values());
   if (inputs.length > 0) {
     setMIDIStatus('connected');
   } else {
     setMIDIStatus('disconnected');
   }
-
-  // Listen for devices being plugged/unplugged
-  _midiDisconnectHandler = (e) => {
-    if (e.port.type === 'input') {
-      const count = Array.from(midiAccess.inputs.values()).length;
-      setMIDIStatus(count > 0 ? 'connected' : 'disconnected');
-    }
-  };
-  midiAccess.onstatechange = _midiDisconnectHandler;
 
   // Wire note messages from all current + future inputs
   const wireInput = (input) => {
@@ -575,11 +562,16 @@ function connectMIDI(midiAccess) {
   };
 
   midiAccess.inputs.forEach(wireInput);
+
+  // Listen for devices being plugged/unplugged — hot-plug + status updates
   midiAccess.onstatechange = (e) => {
-    if (_midiDisconnectHandler) _midiDisconnectHandler(e);
-    // Wire newly connected input
-    if (e.port.type === 'input' && e.port.connection === 'open') {
-      wireInput(e.port);
+    if (e.port.type === 'input') {
+      const count = Array.from(midiAccess.inputs.values()).length;
+      setMIDIStatus(count > 0 ? 'connected' : 'disconnected');
+      // Wire newly connected input
+      if (e.port.connection === 'open') {
+        wireInput(e.port);
+      }
     }
   };
 }

@@ -23,7 +23,7 @@ import { updateScore, setQuestionNote, setPrompt, setFeedback, clearFeedback,
          setupModeRadios, setupNoteTypeRadios, setupInstrumentRadios, setupInstrumentSelect,
          setupLearningMethodRadios,
          setupSidebar, setupThemeToggle, initUI, setupCurriculumPanel,
-         setMIDIStatus } from './ui.js';
+         setMIDIStatus, setMIDIDevices, getSelectedMIDIDevice } from './ui.js';
 
 import { startNoteReadingMode, handleNoteReadingAnswer } from './modes/modes.js';
 import { startEarTrainingMode, handleEarTrainingAnswer, replayEarTraining } from './modes/modes.js';
@@ -540,43 +540,75 @@ function handleKeyboardShortcut(e) {
 
 // ─── MIDI INPUT ─────────────────────────────────────────────────────
 
-function connectMIDI(midiAccess) {
-  const inputs = Array.from(midiAccess.inputs.values());
-  if (inputs.length > 0) {
-    setMIDIStatus('connected');
-  } else {
-    setMIDIStatus('disconnected');
-  }
+const MIDI_DEVICE_KEY = 'pkl_midi_device';
+let _midiAccess = null;
 
-  // Wire note messages from all current + future inputs
-  const wireInput = (input) => {
-    input.onmidimessage = (msg) => {
-      const [status, note, velocity] = msg.data;
-      // Note On (0x90 + channel 0-15, velocity > 0)
-      if (status >= 0x90 && status <= 0x9F && velocity > 0) {
-        const appSemi = note - 12; // MIDI middle C=60 → app C4=48
-        const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
-        handleKeyAnswer(appSemi, keyEl);
-      }
-    };
+/** Wire a single MIDI input's note messages to the answer handler. */
+function wireMidiInput(input) {
+  input.onmidimessage = (msg) => {
+    const [status, note, velocity] = msg.data;
+    // Note On (0x90 + channel 0-15, velocity > 0)
+    if (status >= 0x90 && status <= 0x9F && velocity > 0) {
+      const appSemi = note - 12; // MIDI middle C=60 → app C4=48
+      const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
+      handleKeyAnswer(appSemi, keyEl);
+    }
   };
+}
 
-  midiAccess.inputs.forEach(wireInput);
+/** Apply the current device selection: wire selected device (or all). */
+function applyMidiRouting() {
+  if (!_midiAccess) return;
+  const selectedId = getSelectedMIDIDevice();
+  _midiAccess.inputs.forEach(input => {
+    if (!selectedId || input.id === selectedId) {
+      wireMidiInput(input);
+    } else {
+      input.onmidimessage = null;
+    }
+  });
+}
 
-  // Listen for devices being plugged/unplugged — hot-plug + status updates
+/** Refresh the device list in the sidebar and re-apply routing. */
+function refreshMidiDevices() {
+  if (!_midiAccess) return;
+  const devices = Array.from(_midiAccess.inputs.values()).map(i => ({
+    id: i.id,
+    name: `${i.name || 'MIDI Device'}${i.manufacturer ? ' · ' + i.manufacturer : ''}`,
+  }));
+
+  const savedId = localStorage.getItem(MIDI_DEVICE_KEY) || '';
+  setMIDIDevices(devices, savedId);
+  applyMidiRouting();
+}
+
+function connectMIDI(midiAccess) {
+  _midiAccess = midiAccess;
+  const inputs = Array.from(midiAccess.inputs.values());
+  setMIDIStatus(inputs.length > 0 ? 'connected' : 'disconnected');
+
+  refreshMidiDevices();
+
+  // Hot-plug: refresh list + routing when devices connect/disconnect
   midiAccess.onstatechange = (e) => {
     if (e.port.type === 'input') {
       const count = Array.from(midiAccess.inputs.values()).length;
       setMIDIStatus(count > 0 ? 'connected' : 'disconnected');
-      // Wire newly connected input
-      if (e.port.connection === 'open') {
-        wireInput(e.port);
-      }
+      refreshMidiDevices();
     }
   };
 }
 
 function setupMIDI() {
+  // Device selection change: persist + re-route
+  const deviceSelect = document.getElementById('midiDeviceSelect');
+  if (deviceSelect) {
+    deviceSelect.addEventListener('change', () => {
+      localStorage.setItem(MIDI_DEVICE_KEY, deviceSelect.value);
+      applyMidiRouting();
+    });
+  }
+
   if (!navigator.requestMIDIAccess) {
     setMIDIStatus('unsupported');
     return;

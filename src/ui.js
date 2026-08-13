@@ -28,6 +28,7 @@ const elements = {
   topBarThemeToggle: $('topBarThemeToggle'),
   topBarInstrument: $('topBarInstrument'),
   midiDot: $('midiDot'),
+  midiDeviceSelect: $('midiDeviceSelect'),
 };
 
 // ─── SCORE & MEDAL DISPLAY ────────────────────────────────────────
@@ -147,6 +148,42 @@ export function setMIDIStatus(status) {
   } else {
     dot.title = 'MIDI keyboard not detected';
   }
+}
+
+// ─── MIDI DEVICE SELECTOR ─────────────────────────────────────────
+
+/**
+ * Populate the MIDI device <select> with the given devices.
+ * @param {{id:string, name:string}[]} devices
+ * @param {string} selectedId — id to preselect ('' = all devices)
+ */
+export function setMIDIDevices(devices, selectedId = '') {
+  const select = elements.midiDeviceSelect;
+  if (!select) return;
+  const prev = selectedId || select.value;
+  select.innerHTML = '';
+
+  const allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = '— All devices —';
+  select.appendChild(allOpt);
+
+  devices.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    select.appendChild(opt);
+  });
+
+  // Preserve selection if it still exists; otherwise fall back to "all"
+  const exists = devices.some(d => d.id === prev);
+  select.value = exists ? prev : '';
+}
+
+/** Get the currently selected MIDI device id ('' = all devices). */
+export function getSelectedMIDIDevice() {
+  const select = elements.midiDeviceSelect;
+  return select ? select.value : '';
 }
 
 // ─── MODE SWITCHING ────────────────────────────────────────────────

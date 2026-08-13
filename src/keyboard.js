@@ -62,6 +62,7 @@ export function setKeyboardLocked(locked) {
 
 /** Add pressed animation to a key. */
 export function pressKey(keyEl, duration = 150) {
+  if (!keyEl) return;
   keyEl.classList.add('pressed');
   setTimeout(() => keyEl.classList.remove('pressed'), duration);
 }

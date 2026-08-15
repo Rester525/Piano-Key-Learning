@@ -33,6 +33,8 @@ import { startSpeedRunMode, handleSpeedRunAnswer } from './modes/modes.js';
 import { startKeyboardMode, handleKeyboardAnswer } from './modes/modes.js';
 import { startCurriculumMode, handleCurriculumAnswer, handleCurriculumChordsAnswer,
          curriculumJustCompleted, clearCurriculumCompletion } from './modes/modes.js';
+import { startSheetMode, stopSheetMode, handleSheetAnswer, selectSong,
+         playSheetMelody, toggleMic } from './modes/sheet-mode.js';
 
 import { selectSRSItem, gradeItem } from './srs-engine.js';
 import { getCurrentLevel } from './curriculum.js';
@@ -165,6 +167,11 @@ async function switchMode(newMode) {
   transition(State.IDLE);
   ensureAudioContext().catch(() => {});  // Don't block — keyboard builds regardless
 
+  // Stop mic + clear sheet state when leaving sheet mode
+  if (activeMode === 'sheetMusic' && newMode !== 'sheetMusic') {
+    stopSheetMode();
+  }
+
   activeMode = newMode;
   score = 0;
   streak = 0;
@@ -175,6 +182,10 @@ async function switchMode(newMode) {
   setKeyboardLocked(false);
   showChordButtons(false);
   showSpeedRunTimer(false);
+
+  // Show/hide sheet controls bar
+  const sheetControls = document.getElementById('sheetControls');
+  if (sheetControls) sheetControls.style.display = newMode === 'sheetMusic' ? 'flex' : 'none';
 
   // Hide minimap (only visible in keyboard mode)
   const minimap = document.getElementById('keyboardMinimapWrap');
@@ -237,6 +248,13 @@ async function switchMode(newMode) {
       await startCurriculumMode(context);
       renderCurrentSheetMusic();
       break;
+    case 'sheetMusic':
+      stopSheetMode();
+      setPrompt('Play the highlighted note on the sheet 🎼');
+      showPlayAgain(false);
+      setQuestionNote('?');
+      await startSheetMode(context);
+      break;
     default:
       setPrompt('Coming soon …');
       showPlayAgain(false);
@@ -261,6 +279,9 @@ function handleNoteTypeChange(newNoteType) {
   switch (activeMode) {
     case 'noteReading':
       startNoteReadingMode(context);
+      break;
+    case 'sheetMusic':
+      selectSong(context, localStorage.getItem('pkl_sheet_song') || '');
       break;
     case 'earTraining':
       currentGroup = GROUPS[2];
@@ -321,6 +342,13 @@ function handleKeyAnswer(chosenSemitone, keyEl) {
   // Keyboard free-play mode
   if (activeMode === 'keyboard') {
     handleKeyboardAnswer(context, chosenSemitone, keyEl);
+    return;
+  }
+
+  // Sheet music mode — notes scored against the melody
+  if (activeMode === 'sheetMusic') {
+    handleSheetAnswer(context, chosenSemitone);
+    scheduleCloudSync();
     return;
   }
 
@@ -399,6 +427,7 @@ function renderCurrentSheetMusic() {
   clearStaff('staffCanvas');
 
   if (activeMode === 'keyboard') return; // no sheet music in free play
+  if (activeMode === 'sheetMusic') return; // sheet mode renders its own melody
 
   const semitone = currentSemitone;
   if (semitone === null) return;
@@ -475,6 +504,31 @@ function setupEventListeners() {
       localStorage.setItem('pkl_show_sheet', showSheetMusic);
       renderCurrentSheetMusic();
     });
+  }
+
+  // Sheet music controls (song select, play, mic)
+  const sheetControls = document.getElementById('sheetControls');
+  const songSelect = document.getElementById('sheetSongSelect');
+  if (songSelect) {
+    songSelect.addEventListener('change', () => {
+      if (activeMode === 'sheetMusic') selectSong(context, songSelect.value);
+    });
+  }
+  const playBtn = document.getElementById('sheetPlayBtn');
+  if (playBtn) {
+    playBtn.addEventListener('click', () => {
+      if (activeMode === 'sheetMusic') playSheetMelody(context);
+    });
+  }
+  const micBtn = document.getElementById('sheetMicBtn');
+  if (micBtn) {
+    micBtn.addEventListener('click', () => {
+      if (activeMode === 'sheetMusic') toggleMic(context);
+    });
+  }
+  // Store controls ref for show/hide in switchMode
+  if (sheetControls) {
+    sheetControls.dataset.mode = 'sheetMusic';
   }
 }
 

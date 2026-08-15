@@ -58,6 +58,7 @@
       <label class="sidebar-radio"><input type="radio" name="trainingMode" value="speedRun">Speed Run</label>
       <label class="sidebar-radio"><input type="radio" name="trainingMode" value="keyboard">🎹 Keyboard</label>
       <label class="sidebar-radio"><input type="radio" name="trainingMode" value="curriculum">🎓 Curriculum</label>
+      <label class="sidebar-radio"><input type="radio" name="trainingMode" value="sheetMusic">🎼 Sheet Music</label>
     </fieldset>
 
     <fieldset class="sidebar-section">
@@ -131,6 +132,16 @@
 
     <div class="staff-wrap" id="staffWrap">
       <canvas id="staffCanvas" width="400" height="140"></canvas>
+    </div>
+
+    <div class="sheet-controls" id="sheetControls" style="display:none">
+      <select id="sheetSongSelect" class="sheet-select" title="Choose a song"></select>
+      <button id="sheetPlayBtn" class="sheet-btn" title="Play the whole melody">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="2,3 14,8 2,13"/></svg>
+        Play
+      </button>
+      <button id="sheetMicBtn" class="sheet-btn" title="Use microphone to detect your notes">🎤 Mic: Off</button>
+      <span class="sheet-progress" id="sheetProgress">0/0</span>
     </div>
 
     <div class="chord-btn-row" id="chordBtnRow" style="display:none">

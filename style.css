@@ -702,6 +702,59 @@ body {
 }
 .staff-wrap.hidden { display: none; }
 
+/* ─── SHEET MUSIC MODE CONTROLS ─────────────────────────────────── */
+
+.sheet-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sheet-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  max-width: 220px;
+}
+.sheet-select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.sheet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.sheet-btn:hover { border-color: var(--accent); color: var(--accent); }
+.sheet-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.sheet-progress {
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Next-note highlight on the on-screen keyboard */
+.white-key.sheet-next {
+  box-shadow: inset 0 0 0 3px var(--accent), 0 0 12px var(--accent-glow);
+}
+.black-key.sheet-next {
+  box-shadow: inset 0 0 0 3px var(--accent), 0 0 12px var(--accent-glow);
+}
+
 /* ─── SIDEBAR CHECKBOX ─────────────────────────────────────────── */
 
 .sidebar-checkbox {

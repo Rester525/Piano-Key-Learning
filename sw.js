@@ -3,7 +3,7 @@
 // Cache-first strategy: serve from cache, update in background
 // ═══════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'pkl-v1.2.0';
+const CACHE_NAME = 'pkl-v1.3.0';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -15,6 +15,9 @@ const PRECACHE_URLS = [
   '/src/keyboard.js',
   '/src/ui.js',
   '/src/modes/modes.js',
+  '/src/modes/sheet-mode.js',
+  '/src/songs.js',
+  '/src/pitch-detector.js',
   '/src/stats-engine.js',
   '/src/stats-ui.js',
   '/src/custom-sets.js',

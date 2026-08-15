@@ -5,15 +5,22 @@
 
 import { semitoneToDisplay } from './engine.js';
 
-const VEXFLOW_CDN = 'https://cdn.jsdelivr.net/npm/vexflow@5.1.0/build/cjs/vexflow.js';
+const VEXFLOW_CDN = 'https://cdn.jsdelivr.net/npm/vexflow@5.0.0/build/cjs/vexflow.js';
 
 /** @type {object|null} Cached VexFlow module */
 let VF = null;
 
-/** Lazily load VexFlow. Returns the module (cached after first call). */
+/**
+ * Lazily load VexFlow. Returns the module (cached after first call).
+ * The CJS build is UMD-wrapped: a browser `import()` of it returns an empty
+ * namespace and attaches VexFlow to `window.VexFlow` as a side effect.
+ */
 async function loadVexFlow() {
   if (VF) return VF;
-  VF = await import(VEXFLOW_CDN);
+  await import(VEXFLOW_CDN);
+  VF = (typeof window !== 'undefined' && window.VexFlow) ||
+       (typeof globalThis !== 'undefined' && globalThis.VexFlow);
+  if (!VF) throw new Error('VexFlow failed to load');
   return VF;
 }
 
@@ -29,7 +36,9 @@ function semitoneToVF(semitone, noteType) {
   const noteNames = noteType === 'flats'
     ? ['c','db','d','eb','e','f','gb','g','ab','a','bb','b']
     : ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
-  const octave = Math.floor(semitone / 12) - 1; // VexFlow uses C4 = c/4, C0=0 → c/0? Actually MIDI C4=60, app C4=48, so octave = Math.floor(48/12)-1 = 3. VF expects c/4 for middle C.
+  // VexFlow's key intValue for 'c/4' is 48 = the app's C4=48 convention.
+  // So octave = floor(semitone/12) maps directly (C4 → 'c/4').
+  const octave = Math.floor(semitone / 12);
   const pc = ((semitone % 12) + 12) % 12;
   return noteNames[pc] + '/' + Math.max(0, octave);
 }
@@ -48,14 +57,13 @@ export async function renderNote(canvasId, semitone, noteType, color) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const vfNote = semitoneToVF(semitone, noteType);
   if (!vfNote) return;
 
   const renderer = new VF.Renderer(canvas, VF.Renderer.Backends.CANVAS);
   renderer.resize(400, 140);
+  const ctx = renderer.getContext();
+
   const stave = new VF.Stave(10, 40, 380);
   stave.addClef('treble').setContext(ctx).draw();
 
@@ -73,15 +81,14 @@ export async function renderInterval(canvasId, rootSemitone, targetSemitone, not
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const rootVF = semitoneToVF(rootSemitone, noteType);
   const targetVF = semitoneToVF(targetSemitone, noteType);
   if (!rootVF || !targetVF) return;
 
   const renderer = new VF.Renderer(canvas, VF.Renderer.Backends.CANVAS);
   renderer.resize(400, 140);
+  const ctx = renderer.getContext();
+
   const stave = new VF.Stave(10, 40, 380);
   stave.addClef('treble').setContext(ctx).draw();
 
@@ -99,14 +106,13 @@ export async function renderChord(canvasId, semitones, noteType, color) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const vfNotes = semitones.map(s => semitoneToVF(s, noteType)).filter(Boolean);
   if (vfNotes.length === 0) return;
 
   const renderer = new VF.Renderer(canvas, VF.Renderer.Backends.CANVAS);
   renderer.resize(400, 140);
+  const ctx = renderer.getContext();
+
   const stave = new VF.Stave(10, 40, 380);
   stave.addClef('treble').setContext(ctx).draw();
 
@@ -124,4 +130,75 @@ export function clearStaff(canvasId) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ─── MELODY RENDER (Sheet Music mode) ───────────────────────────────
+
+// Colors matching the app's design tokens
+const NOTE_COLORS = {
+  pending: '#b0b8c4',   // muted grey — not yet played
+  correct: '#2ecc71',   // green
+  wrong:   '#e74c3c',   // red
+  current: '#7c6af7',   // accent purple — the note to play next
+};
+
+/**
+ * Render a full melody as sheet music, one stave line per N notes.
+ * Each note is colored by its state: 'pending' | 'correct' | 'wrong'.
+ * The note at `currentIndex` is highlighted as 'current'.
+ *
+ * @param {string} canvasId
+ * @param {number[]} notes - absolute semitones (C4=48)
+ * @param {string[]} states - per-note state ('pending'|'correct'|'wrong')
+ * @param {string} noteType - 'sharps'|'flats'|'whole'|'all'
+ * @param {number} currentIndex - index of the note to highlight
+ */
+export async function renderMelody(canvasId, notes, states, noteType, currentIndex) {
+  const VF = await loadVexFlow();
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const NOTES_PER_LINE = 7;
+  const STAVE_WIDTH = 380;
+  const STAVE_HEIGHT = 130;
+  const PADDING = 10;
+
+  const lineCount = Math.ceil(notes.length / NOTES_PER_LINE);
+  const totalWidth = STAVE_WIDTH + PADDING * 2;
+  const totalHeight = lineCount * STAVE_HEIGHT + PADDING * 2;
+
+  canvas.width = totalWidth;
+  canvas.height = totalHeight;
+  canvas.style.width = totalWidth + 'px';
+  canvas.style.height = totalHeight + 'px';
+
+  const renderer = new VF.Renderer(canvas, VF.Renderer.Backends.CANVAS);
+  renderer.resize(totalWidth, totalHeight);
+  const ctx = renderer.getContext();
+
+  for (let line = 0; line < lineCount; line++) {
+    const start = line * NOTES_PER_LINE;
+    const lineNotes = notes.slice(start, start + NOTES_PER_LINE);
+    const y = PADDING + line * STAVE_HEIGHT;
+
+    const stave = new VF.Stave(PADDING, y, STAVE_WIDTH);
+    stave.addClef('treble').setContext(ctx).draw();
+
+    const vfStaveNotes = lineNotes.map((semi, i) => {
+      const globalIdx = start + i;
+      const vfNote = semitoneToVF(semi, noteType);
+      const isCurrent = globalIdx === currentIndex;
+      // Precedence: wrong (red) > correct (green) > current (purple) > pending
+      const state = (states[globalIdx] === 'wrong' || states[globalIdx] === 'correct')
+        ? states[globalIdx]
+        : (isCurrent ? 'current' : 'pending');
+
+      const note = new VF.StaveNote({ keys: [vfNote], duration: 'q' });
+      const color = NOTE_COLORS[state] || NOTE_COLORS.pending;
+      note.setStyle({ fillStyle: color, strokeStyle: color });
+      return note;
+    });
+
+    VF.Formatter.FormatAndDraw(ctx, stave, vfStaveNotes);
+  }
 }

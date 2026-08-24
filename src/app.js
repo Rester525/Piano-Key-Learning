@@ -595,18 +595,48 @@ function handleKeyboardShortcut(e) {
 // ─── MIDI INPUT ─────────────────────────────────────────────────────
 
 const MIDI_DEVICE_KEY = 'pkl_midi_device';
+const MIDI_DUPLICATE_WINDOW_MS = 100;
 let _midiAccess = null;
+const _recentMidiNotes = new Map();
+
+function midiPitchClass(note) {
+  return ((note % 12) + 12) % 12;
+}
+
+/**
+ * Artesia DP-150e can emit two octave-separated Note-On messages for one
+ * physical key press. Suppress same-pitch-class duplicates from one input
+ * within the same press window so Sheet Music does not score the duplicate
+ * against the next melody note.
+ */
+function isDuplicateMidiNote(input, note) {
+  const key = `${input.id}:${midiPitchClass(note)}`;
+  const now = performance.now();
+  const previous = _recentMidiNotes.get(key);
+  _recentMidiNotes.set(key, now);
+
+  // Keep this map bounded while the app is open for a long practice session.
+  for (const [entryKey, timestamp] of _recentMidiNotes) {
+    if (now - timestamp > MIDI_DUPLICATE_WINDOW_MS * 4) {
+      _recentMidiNotes.delete(entryKey);
+    }
+  }
+
+  return previous !== undefined && now - previous < MIDI_DUPLICATE_WINDOW_MS;
+}
 
 /** Wire a single MIDI input's note messages to the answer handler. */
 function wireMidiInput(input) {
   input.onmidimessage = (msg) => {
     const [status, note, velocity] = msg.data;
-    // Note On (0x90 + channel 0-15, velocity > 0)
-    if (status >= 0x90 && status <= 0x9F && velocity > 0) {
-      const appSemi = note - 12; // MIDI middle C=60 → app C4=48
-      const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
-      handleKeyAnswer(appSemi, keyEl);
-    }
+    const messageType = status & 0xF0;
+    // Note On only; Note On with velocity 0 is Note Off.
+    if (messageType !== 0x90 || velocity <= 0) return;
+    if (isDuplicateMidiNote(input, note)) return;
+
+    const appSemi = note - 12; // MIDI middle C=60 → app C4=48
+    const keyEl = document.querySelector(`[data-semitone="${appSemi}"]`);
+    handleKeyAnswer(appSemi, keyEl);
   };
 }
 

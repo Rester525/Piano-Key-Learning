@@ -30,7 +30,6 @@ function whiteKeysInRange(minSemi, maxSemi) {
 function pitchClass(semi) {
   return ((semi % 12) + 12) % 12;
 }
-
 /** Render the current sheet state to the staff canvas. */
 async function renderSheet() {
   if (!song || !_context) return;

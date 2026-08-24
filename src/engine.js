@@ -117,6 +117,11 @@ export function semitoneToNote(semitone, ntype) {
   return semitoneToDisplay(semitone, ntype) + oct;
 }
 
+/** True if two semitones are the same pitch class, ignoring octave (C4 == C5). */
+export function samePitchClass(a, b) {
+  return ((a % 12) + 12) % 12 === ((b % 12) + 12) % 12;
+}
+
 // ─── GROUP / KEYBOARD DATA (semitone-based) ────────────────────────
 
 /** Build the flat list of playable semitones for a group + noteType. */

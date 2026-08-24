@@ -2,7 +2,7 @@
 // MODES — Game Mode Implementations
 // ══════════════════════════════════════════════════════════════════
 
-import { GROUPS, semitoneToDisplay, INTERVAL_NAMES, CHORD_QUALITIES, CHROMATIC } from '../engine.js';
+import { GROUPS, semitoneToDisplay, INTERVAL_NAMES, CHORD_QUALITIES, CHROMATIC, samePitchClass } from '../engine.js';
 import { selectSRSItem, gradeItem } from '../srs-engine.js';
 import { LEVELS, getCurrentLevel, getProgress, recordAttempt as recordCurriculumAttempt, isLevelCompleted } from '../curriculum.js';
 
@@ -62,7 +62,7 @@ export async function handleNoteReadingAnswer(context, chosenSemitone, keyEl) {
   if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
-  const correct = chosenSemitone === currentSemitone;
+  const correct = samePitchClass(chosenSemitone, currentSemitone);
 
   await ensureAudioContext();
   playDing(chosenSemitone);
@@ -136,7 +136,7 @@ export async function handleEarTrainingAnswer(context, chosenSemitone, keyEl) {
   if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
-  const correct = chosenSemitone === currentSemitone;
+  const correct = samePitchClass(chosenSemitone, currentSemitone);
 
   await ensureAudioContext();
   playDing(chosenSemitone);
@@ -239,7 +239,7 @@ export async function handleIntervalsAnswer(context, chosenSemitone, keyEl) {
   if (getState() !== State.QUESTION_ACTIVE) return;
   transition(State.ANSWER_PENDING);
 
-  const correct = chosenSemitone === currentSemitone;
+  const correct = samePitchClass(chosenSemitone, currentSemitone);
 
   await ensureAudioContext();
   playDing(chosenSemitone);
@@ -448,7 +448,7 @@ export async function handleSpeedRunAnswer(context, chosenSemitone, keyEl) {
   if (getSpeedRunTimeLeft() <= 0) return;
   transition(State.ANSWER_PENDING);
 
-  const correct = chosenSemitone === currentSemitone;
+  const correct = samePitchClass(chosenSemitone, currentSemitone);
 
   await ensureAudioContext();
   playDing(chosenSemitone);
@@ -734,7 +734,7 @@ export async function handleCurriculumAnswer(context, chosenSemitone, keyEl) {
   transition(State.ANSWER_PENDING);
 
   const level = getCurrentLevel();
-  const correct = chosenSemitone === context.currentSemitone;
+  const correct = samePitchClass(chosenSemitone, context.currentSemitone);
 
   await ensureAudioContext();
   playDing(chosenSemitone);
